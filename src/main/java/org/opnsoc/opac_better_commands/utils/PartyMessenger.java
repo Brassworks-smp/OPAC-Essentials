@@ -35,6 +35,6 @@ public class PartyMessenger {
         messageComponent.getSiblings().add(rankComponent);
         messageComponent.getSiblings().add(nameComponent);
         messageComponent.getSiblings().add(contentComponent);
-        new PartyOnCommandUpdater().update(sender.getUUID(), serverData, party, serverData.getPlayerConfigs(), mi -> false, messageComponent);
+        new PartyOnCommandUpdater().update(sender.getUUID(), serverData, party, serverData.getPlayerConfigManager(), mi -> false, messageComponent);
     }
 }
