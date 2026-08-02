@@ -126,7 +126,7 @@ OPAC - Essentials 2.0 is under active development and should be treated as exper
 
 ## License
 
-Licensed under the [Apache License 2.0](./LICENSE). You may use, modify and redistribute this software under the terms of that license.
+Licensed under the [Apache License 2.0](https://github.com/Brassworks-smp/OPAC-Essentials?tab=Apache-2.0-1-ov-file). You may use, modify and redistribute this software under the terms of that license.
 
 ## Credits
 
