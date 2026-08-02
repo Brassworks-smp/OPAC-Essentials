@@ -6,7 +6,6 @@ The next generation of OPAC - Better Commands.
 
 [![Minecraft 1.21.1](https://img.shields.io/badge/Minecraft-1.21.1-62b47a?logo=minecraft)](https://www.minecraft.net/)
 [![NeoForge 21.1.216+](https://img.shields.io/badge/NeoForge-21.1.216%2B-f16436)](https://neoforged.net/)
-[![Version 2.0 ALPHA](https://img.shields.io/badge/version-2.0%20ALPHA-e67e22)](#development-status)
 [![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](https://github.com/Brassworks-smp/OPAC-Essentials)
 [![Join Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/nDhkgzAPR2)
 
