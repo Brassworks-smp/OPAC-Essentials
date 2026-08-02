@@ -136,6 +136,6 @@ Licensed under the [Apache License 2.0](./LICENSE). You may use, modify and redi
 
 ## Links
 
-* [Project repository](https://github.com/DerErneuerer/OPAC-BetterCommands)
+* [Project repository](https://github.com/Brassworks-smp/OPAC-Essentials)
 * [Brassworks SMP website](https://brassworks.opnsoc.org/)
 * [Open Parties and Claims repository](https://github.com/thexaero/open-parties-and-claims)
