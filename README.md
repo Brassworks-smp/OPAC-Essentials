@@ -8,9 +8,7 @@
 [![Version](https://img.shields.io/badge/version-2.0%20ALPHA-e67e22)](#development-status)
 [![OPAC API](https://img.shields.io/badge/OPAC%20API-v1%20%7C%20v2-3498db)](https://www.curseforge.com/minecraft/mc-mods/open-parties-and-claims)
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](https://github.com/DerErneuerer/OPAC-BetterCommands)
-[![Discord](https://img.shields.io/badge/Discord%20-Join%20%7C%20Now3498db?logo=discrd)](https://github.com/DerErneuerer/OPAC-BetterCommands)
-
-[![Discord](https://wsrv.nl/?url=https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/cozy/social/discord-plural_vector.svg&h=64)](https://discord.com/invite/nDhkgzAPR2)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/nDhkgzAPR2)
 
 **OPAC - Essentials** is an addon for [Open Parties and Claims](https://github.com/thexaero/open-parties-and-claims), developed for the [Brassworks SMP](https://brassworks.opnsoc.org/). It expands the original OPAC - Better Commands project with configurable short commands, party chat and fine-grained claim permissions for Minecraft 1.21.1.
 
