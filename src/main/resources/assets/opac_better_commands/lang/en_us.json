@@ -1,7 +1,0 @@
-{
-  "message.party.not_in_party": "You are not in a party!",
-  "message.party_chat.status": "Party chat is now",
-  "message.party_chat.changed_status": "Party chat has been",
-  "message.party_chat.state.activated": "enabled",
-  "message.party_chat.state.deactivated": "disabled"
-}

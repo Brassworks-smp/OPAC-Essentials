@@ -1,49 +1,53 @@
-package org.opnsoc.opac_better_commands.command;
+package brassworks.opac_essentials.command;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import brassworks.opac_essentials.opac_essentials;
+import brassworks.opac_essentials.utils.PartyMessenger;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import org.opnsoc.opac_better_commands.opac_better_commands;
-import org.opnsoc.opac_better_commands.utils.PartyMessenger;
-import xaero.pac.common.server.parties.command.CommandRequirementProvider;
 
 import java.util.UUID;
 import java.util.function.Predicate;
 
-public class PartyChatCommand {
-    public void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandRequirementProvider commandRequirementProvider) {
-        Predicate<CommandSourceStack> requirement = commandRequirementProvider.getMemberRequirement((party, mi) -> true);
+public final class PartyChatCommand {
+    private final String commandName;
 
-        // Toggle
+    public PartyChatCommand(String commandName) {
+        this.commandName = commandName;
+    }
+
+    public void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+        Predicate<CommandSourceStack> requirement =
+                source -> source.getEntity() instanceof ServerPlayer;
+
         Command<CommandSourceStack> toggleAction = ctx -> {
             ServerPlayer player = ctx.getSource().getPlayerOrException();
             UUID id = player.getUUID();
-            boolean newState = !opac_better_commands.PARTY_CHAT_ENABLED.getOrDefault(id, false);
-            opac_better_commands.PARTY_CHAT_ENABLED.put(id, newState);
+            boolean newState = opac_essentials.togglePartyChat(id);
             Component stateText = Component.literal(
                     newState ? "enabled" : "disabled"
             ).withStyle(newState ? ChatFormatting.GREEN : ChatFormatting.RED);
-            player.sendSystemMessage(Component.literal("Party chat is now").append(Component.literal(" ")).append(stateText));
+            player.sendSystemMessage(Component.literal("Party chat is now ").append(stateText));
             return 1;
         };
 
-        // Status
         Command<CommandSourceStack> statusAction = ctx -> {
             ServerPlayer player = ctx.getSource().getPlayerOrException();
-            boolean state = opac_better_commands.PARTY_CHAT_ENABLED.getOrDefault(player.getUUID(), false);
+            boolean state = opac_essentials.isPartyChatEnabled(player.getUUID());
             Component stateText = Component.literal(
                     state ? "enabled" : "disabled"
             ).withStyle(state ? ChatFormatting.GREEN : ChatFormatting.RED);
-            player.sendSystemMessage(Component.literal("Party chat has been").append(Component.literal(" ")).append(stateText));
+            player.sendSystemMessage(
+                    Component.literal("Party chat has been ").append(stateText)
+            );
             return 1;
         };
 
-        // Message
         Command<CommandSourceStack> messageAction = ctx -> {
             ServerPlayer player = ctx.getSource().getPlayerOrException();
             String message = StringArgumentType.getString(ctx, "message");
@@ -52,11 +56,12 @@ public class PartyChatCommand {
         };
 
         dispatcher.register(
-                Commands.literal("pchat")
+                Commands.literal(commandName)
                         .requires(requirement)
                         .then(Commands.literal("toggle").executes(toggleAction))
                         .then(Commands.literal("status").executes(statusAction))
-                        .then(Commands.argument("message", StringArgumentType.greedyString()).executes(messageAction))
+                        .then(Commands.argument("message", StringArgumentType.greedyString())
+                                .executes(messageAction))
         );
     }
 }
