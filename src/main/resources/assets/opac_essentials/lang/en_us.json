@@ -12,5 +12,8 @@
   "screen.opac_essentials.claim_permissions.category": "Category",
   "screen.opac_essentials.claim_permissions.target_id": "Registry ID",
   "screen.opac_essentials.claim_permissions.action": "Action",
-  "screen.opac_essentials.claim_permissions.player": "Player (or 'all')"
+  "screen.opac_essentials.claim_permissions.player": "Player (or 'all')",
+  "screen.opac_essentials.claim_search": "Claim Search",
+  "screen.opac_essentials.claim_search.hint": "Search claim owner...",
+  "screen.opac_essentials.claim_search.toggle": "Open/close claim search"
 }

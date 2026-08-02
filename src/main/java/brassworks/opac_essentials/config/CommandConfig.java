@@ -14,7 +14,7 @@ public final class CommandConfig {
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
         builder.comment(
-                "Command names used by OPAC - Essentials 2.0.",
+                "Command names used by OPAC - Essentials.",
                 "Changing a command name requires a full server restart."
         ).push("commands");
 

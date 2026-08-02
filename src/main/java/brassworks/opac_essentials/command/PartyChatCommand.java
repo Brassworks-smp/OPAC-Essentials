@@ -49,10 +49,8 @@ public final class PartyChatCommand {
         };
 
         Command<CommandSourceStack> messageAction = ctx -> {
-            ServerPlayer player = ctx.getSource().getPlayerOrException();
             String message = StringArgumentType.getString(ctx, "message");
-            PartyMessenger.sendPartyMessage(player, message);
-            return 1;
+            return PartyMessenger.sendPartyMessage(ctx.getSource(), message);
         };
 
         dispatcher.register(

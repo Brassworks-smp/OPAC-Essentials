@@ -8,6 +8,8 @@
     "ServerGamePacketListenerMixin"
   ],
   "client": [
+    "XaeroClaimsHighlighterMixin",
+    "XaeroChunkHighlighterMixin"
   ],
   "injectors": {
     "defaultRequire": 1
