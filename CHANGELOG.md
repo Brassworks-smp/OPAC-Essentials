@@ -18,7 +18,7 @@
 * Expanded the project from a small collection of fixed command aliases into a configurable OPAC utility and permission addon
 * `/claim` and `/unclaim` no longer accept coordinates or chunk arguments; they always use the player's current chunk
 * `/pchat <message>` and toggled party chat now use OPAC's native `/opm` handling and standard party message format
-* Raised the supported NeoForge baseline to **21.1.216** for Minecraft 1.21.1
+* Raised the supported NeoForge baseline to **21.1.216** and above for Minecraft 1.21.1
 * The permission UI and network features now require OPAC - Essentials on both the client and server
 
 ### Fixed
