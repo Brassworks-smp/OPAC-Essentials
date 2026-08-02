@@ -3,11 +3,11 @@
   <p>The next generation of OPAC - Better Commands.</p>
 </div>
 
- <p>[![Minecraft 1.21.1](https://img.shields.io/badge/Minecraft-1.21.1-62b47a?logo=minecraft)](https://www.minecraft.net/)
+[![Minecraft 1.21.1](https://img.shields.io/badge/Minecraft-1.21.1-62b47a?logo=minecraft)](https://www.minecraft.net/)
 [![NeoForge 21.1.216+](https://img.shields.io/badge/NeoForge-21.1.216%2B-f16436)](https://neoforged.net/)
 [![Version](https://img.shields.io/badge/version-2.0%20ALPHA-e67e22)](#development-status)
 [![OPAC API](https://img.shields.io/badge/OPAC%20API-v1%20%7C%20v2-3498db)](https://www.curseforge.com/minecraft/mc-mods/open-parties-and-claims)
-[![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](https://github.com/DerErneuerer/OPAC-BetterCommands) </p>
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](https://github.com/DerErneuerer/OPAC-BetterCommands)
 
 [![Discord](https://wsrv.nl/?url=https://cdn.jsdelivr.net/npm/@intergrav/devins-badges@3/assets/cozy/social/discord-plural_vector.svg&h=64)](https://discord.com/invite/nDhkgzAPR2)
 
