@@ -21,13 +21,6 @@
 * Raised the supported NeoForge baseline to **21.1.216** and above for Minecraft 1.21.1
 * The permission UI and network features now require OPAC - Essentials on both the client and server
 
-### Compatibility
-
-* Minecraft **1.21.1**
-* NeoForge **21.1.216 or newer** within the 21.1 release line
-* Open Parties and Claims **0.25.8 or newer**
-* OPAC **API v1 and API v2**
-
 ### Migration Notes
 
 * Releases before 2.0 use the old **OPAC - Better Commands** name and belong to the legacy generation of the mod
