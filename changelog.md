@@ -8,11 +8,4 @@
 
 ### Changed
 
-* Claim searching now uses incremental snapshots and asynchronous cluster calculation to reduce client-side lag
-* Searching centers the map instead of hiding unrelated claims
 * Party chat now forwards native OPAC `/opm` errors to the player
-
-### Compatibility
-
-* Requires Xaero’s World Map for the claim search interface
-* Supports older Xaero versions with different World Map button layouts
