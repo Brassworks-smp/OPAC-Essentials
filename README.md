@@ -123,17 +123,13 @@ Both the client and server need the mod when using the permission UI and its net
 The following features are planned and may change during ALPHA development:
 
 * Complete overhaul of the OPAC claim and party interfaces
-* A unified Create-inspired UI for claims, subclaims, parties and permissions
+* A unified UI for claims, subclaims, parties and permissions
 * More permission targets and actions
 * Permission presets for common automation and multiplayer use cases
 * Party-, rank- and group-based permission rules
 * Improved permission search, filtering and bulk editing
-* Better support for automation, inventories, fluids, vehicles and contraptions
-* Additional protection controls for explosions, projectiles and teleportation
-* In-game administration and diagnostics for server owners
 * Permission import, export and migration tools
 * More configuration options and localization support
-* Expanded compatibility with other claim, team and automation mods
 
 Roadmap entries are goals, not guarantees. Their scope and release order may change based on testing, OPAC API changes and community feedback.
 
