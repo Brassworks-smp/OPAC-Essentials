@@ -2,8 +2,8 @@ package brassworks.opac_essentials;
 
 import brassworks.opac_essentials.command.CommandRegister;
 import brassworks.opac_essentials.config.CommandConfig;
-import brassworks.opac_essentials.listener.PartyChatListener;
-import brassworks.opac_essentials.network.ClaimPermissionsNetwork;
+import brassworks.opac_essentials.partychat.PartyChatListener;
+import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsNetwork;
 import com.mojang.logging.LogUtils;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
