@@ -125,7 +125,6 @@ The following features are planned and may change during ALPHA development:
 * Complete overhaul of the OPAC claim and party interfaces
 * A unified UI for claims, subclaims, parties and permissions
 * More permission targets and actions
-* Permission presets for common automation and multiplayer use cases
 * Party-, rank- and group-based permission rules
 * Improved permission search, filtering and bulk editing
 * Permission import, export and migration tools
