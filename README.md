@@ -112,6 +112,7 @@ Claim snapshots and cluster calculations are processed incrementally and asynchr
 * NeoForge 21.1.216 or newer within the 21.1 release line
 * Open Parties and Claims 0.25.8 or newer
 * Xaero's World Map for the optional claim search interface
+* If on Client, **KotlinForForge** is required
 
 OPAC - Essentials contains a compatibility layer for both **OPAC API v1 and API v2**. This keeps older supported OPAC releases using API v1 compatible while allowing newer API v2 releases to work without a separate build.
 
