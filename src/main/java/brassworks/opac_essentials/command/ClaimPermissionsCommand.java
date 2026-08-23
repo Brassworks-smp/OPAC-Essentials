@@ -18,13 +18,13 @@ import net.minecraft.commands.arguments.ResourceLocationArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import brassworks.opac_essentials.compat.OpenPacCompat;
-import brassworks.opac_essentials.network.ClaimPermissionsNetwork;
-import brassworks.opac_essentials.permission.ClaimPermissionAction;
-import brassworks.opac_essentials.permission.ClaimPermissionKey;
-import brassworks.opac_essentials.permission.ClaimPermissionTarget;
-import brassworks.opac_essentials.permission.ClaimPermissionsSavedData;
-import brassworks.opac_essentials.permission.ClaimPermissionsUiService;
+import brassworks.opac_essentials.compat.openpac.OpenPacCompat;
+import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsNetwork;
+import brassworks.opac_essentials.claims.permission.model.ClaimPermissionAction;
+import brassworks.opac_essentials.claims.permission.model.ClaimPermissionKey;
+import brassworks.opac_essentials.claims.permission.model.ClaimPermissionTarget;
+import brassworks.opac_essentials.claims.permission.server.ClaimPermissionsSavedData;
+import brassworks.opac_essentials.claims.permission.server.ClaimPermissionsUiService;
 
 import java.util.Collection;
 import java.util.List;
@@ -263,7 +263,11 @@ public final class ClaimPermissionsCommand {
                 player.level().dimension().location(),
                 player.chunkPosition()
         );
-        return claim != null && claim.ownerId().equals(player.getUUID()) ? claim : null;
+        return claim != null
+                && (claim.ownerId().equals(player.getUUID())
+                || player.createCommandSourceStack().hasPermission(2))
+                ? claim
+                : null;
     }
 
     private OpenPacCompat.Claim getOwnedClaim(CommandSourceStack source) {
@@ -408,15 +412,16 @@ public final class ClaimPermissionsCommand {
         if (claim == null) {
             player.sendSystemMessage(
                     Component.literal(
-                            "Stand inside one of your claims or subclaims first."
+                            "Stand inside a claim or subclaim first."
                     ).withStyle(ChatFormatting.RED)
             );
             return null;
         }
-        if (!claim.ownerId().equals(player.getUUID())) {
+        if (!claim.ownerId().equals(player.getUUID())
+                && !player.createCommandSourceStack().hasPermission(2)) {
             player.sendSystemMessage(
                     Component.literal(
-                            "Only the owner can change permissions for this claim."
+                            "Only the owner or an admin can change permissions for this claim."
                     ).withStyle(ChatFormatting.RED)
             );
             return null;

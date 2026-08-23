@@ -4,7 +4,7 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import brassworks.opac_essentials.opac_essentials;
-import brassworks.opac_essentials.utils.PartyMessenger;
+import brassworks.opac_essentials.partychat.PartyMessenger;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;

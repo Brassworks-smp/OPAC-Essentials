@@ -1,7 +1,7 @@
-package brassworks.opac_essentials.mixin;
+package brassworks.opac_essentials.mixin.common;
 
 import brassworks.opac_essentials.opac_essentials;
-import brassworks.opac_essentials.utils.PartyMessenger;
+import brassworks.opac_essentials.partychat.PartyMessenger;
 import net.minecraft.network.chat.PlayerChatMessage;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;

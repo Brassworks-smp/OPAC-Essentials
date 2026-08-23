@@ -1,6 +1,6 @@
-package brassworks.opac_essentials.mixin;
+package brassworks.opac_essentials.mixin.client;
 
-import brassworks.opac_essentials.client.ClaimSearchClient;
+import brassworks.opac_essentials.claims.search.client.ClaimSearchClient;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;

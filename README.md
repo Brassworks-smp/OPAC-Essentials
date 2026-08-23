@@ -11,19 +11,13 @@ The next generation of OPAC - Better Commands.
 
 </div>
 
-**OPAC - Essentials** is an addon for [Open Parties and Claims](https://github.com/thexaero/open-parties-and-claims), developed for the [Brassworks SMP](https://brassworks.opnsoc.org/). It expands the original OPAC - Better Commands project with configurable short commands, party chat, fine-grained claim permissions and Xaero's World Map integration for Minecraft 1.21.1.
+**OPAC - Essentials** is an addon for [Open Parties and Claims](https://github.com/thexaero/open-parties-and-claims), developed for the [Brassworks SMP](https://brassworks.opnsoc.org/). It adds configurable short commands, party chat, fine-grained claim permissions and Xaero's World Map integration for Minecraft 1.21.1.
 
-Manage access to individual blocks, block entities, entities and throwable items through an in-game screen or commands while keeping OPAC in control of claims and parties. Search for claim owners directly from Xaero's World Map, jump to their claims and cycle through disconnected claim clusters.
+Manage access to individual blocks, block entities, entities and throwable items through an in-game interface or commands. Search for claim owners directly from Xaero's World Map and jump between their claim clusters.
 
-> **⚠ WARNING**
->
-> OPAC - Essentials 2.0 is currently in **ALPHA**. Features, commands, configuration values, saved data and user interfaces may change between releases. Back up your world before updating and test new versions before using them on a production server.
+## Legacy Releases
 
-## Version 2.0
-
-Version 2.0 renames and expands **OPAC - Better Commands** into **OPAC - Essentials** and starts the new, configurable generation of the project.
-
-**Every release before 2.0 belongs to the legacy version of the mod.** Those releases use the old **OPAC - Better Commands** name and only provide fixed command features. They do not include configurable command names or the expanded 2.0 permission system and roadmap.
+Every release before 2.0 belongs to the legacy generation of the mod. Those releases use the old **OPAC - Better Commands** name and only provide fixed command features. They do not include configurable command names or the current permission system.
 
 ## Features
 
@@ -36,18 +30,21 @@ Version 2.0 renames and expands **OPAC - Better Commands** into **OPAC - Essenti
   * `/unclaim` unclaims the chunk in which the player is standing
   * Coordinates and additional chunk arguments are intentionally not accepted
 * Party chat with direct messages, toggle and status commands
-* In-game claim permission screen through `/claims permissions`
-* Separate permissions for main claims and subclaims
-* Permissions for all players or a specific player
-* Registry-aware search and suggestions for modded content
+* Claim permission interface through `/claims permissions`
+  * Separate rules for main claims and subclaims
+  * Rules for all players or one or more specific players
+  * Search, visual target previews and registry-aware suggestions for modded content
+  * Multi-action, multi-player and bulk editing
+  * Staged changes with a single save step
+  * Management by claim owners and server administrators
+  * Command fallback and automatic migration of legacy grouped rules
 * Claim owner search directly in Xaero's World Map
   * Centers the map on the first matching claim cluster
   * Previous and next controls cycle through disconnected claim clusters
   * The currently selected cluster receives a highly visible outline
-  * Incremental snapshots and asynchronous cluster calculation reduce client-side lag with large claim counts
-  * The search button automatically adapts to different Xaero's World Map layouts
+  * Asynchronous cluster calculation reduces client-side lag with large claim counts
 
-<div align="center"><img src="https://cdn.modrinth.com/data/cached_images/7eac537a5b2e55b630641d2191babbeea4f08eb6_0.webp" alt="Preview of the OPAC Essentials claim permissions interface"></div>
+![ui preview](https://cdn.modrinth.com/data/cached_images/07f4e4e81725d49e62d36932ec57c7db6098c064.png)
 
 ## Command Configuration
 
@@ -79,15 +76,17 @@ Claim owners can grant exceptions for individual registry entries instead of ope
 | Blocks | Interact, break and place |
 | Block entities | Interact and break |
 | Entities | Interact and attack |
-| Throwable items and projectiles | Throwable |
+| Throwable items and projectiles | Throw, use and projectile impact |
 
-Permissions can apply to either all players or one selected player. To manage them, stand inside a claim or subclaim you own and run the configured claims command followed by `permissions`:
+Rules can apply to all players or to one or more selected players. To manage them, stand inside a claim or subclaim you own and run:
 
 ```text
 /claims permissions
 ```
 
-The same permissions can also be listed, added and removed through the command tree.
+The interface supports search, registry suggestions, multiple actions and players, per-target player assignments and bulk access changes. Edits remain staged until **Save & Done** is pressed. Server administrators with permission level 2 can also manage the claim or subclaim in which they are standing.
+
+Permissions can also be listed, added and removed through the command tree. Older grouped permission data is migrated automatically when loaded.
 
 ## Party Chat
 
@@ -103,9 +102,9 @@ Party messages use OPAC's native handling and formatting. Errors returned by OPA
 
 ## Xaero's World Map Claim Search
 
-When Xaero's World Map is installed, a search button is added to the World Map interface. Enter a player's name to center the map on that player's first claim cluster. If the player owns multiple disconnected clusters, use the previous and next controls below the search field to cycle between them.
+When Xaero's World Map is installed, a search button is added to the map interface. Enter a player's name to center the map on their first claim cluster. Previous and next controls cycle through disconnected clusters, while a high-visibility outline marks the current selection.
 
-The selected cluster is marked with a fixed, high-visibility outline that remains recognizable regardless of the owner's configured claim color. Claim data is copied incrementally on the client thread, while cluster calculation runs asynchronously on an immutable snapshot. Xaero and OPAC's mutable state and rendering remain on their original threads to avoid data corruption.
+Claim snapshots and cluster calculations are processed incrementally and asynchronously to reduce client-side lag with large claim counts.
 
 ## Requirements and Compatibility
 
@@ -120,21 +119,20 @@ Both the client and server need the mod when using the permission UI and its net
 
 ## Planned Features
 
-The following features are planned and may change during ALPHA development:
+The following features are planned and may change during development:
 
 * Complete overhaul of the OPAC claim and party interfaces
 * A unified UI for claims, subclaims, parties and permissions
 * More permission targets and actions
 * Party-, rank- and group-based permission rules
-* Improved permission search, filtering and bulk editing
-* Permission import, export and migration tools
+* Permission import, export and advanced migration tools
 * More configuration options and localization support
 
 Roadmap entries are goals, not guarantees. Their scope and release order may change based on testing, OPAC API changes and community feedback.
 
 ## Development Status
 
-OPAC - Essentials 2.0 is under active development and should be treated as experimental software. Please include the Minecraft, NeoForge, OPAC, OPAC - Essentials and Xaero's World Map versions when reporting an issue.
+OPAC - Essentials is under active development and should be treated as experimental software. Please include the Minecraft, NeoForge, OPAC, OPAC - Essentials and Xaero's World Map versions when reporting an issue.
 
 ## License
 
@@ -149,6 +147,7 @@ Licensed under the [Apache License 2.0](https://github.com/Brassworks-smp/OPAC-E
 ## Links
 
 * [Project repository](https://github.com/Brassworks-smp/OPAC-Essentials)
+* [Changelog](https://github.com/Brassworks-smp/OPAC-Essentials/blob/main/CHANGELOG.md)
 * [Brassworks SMP website](https://brassworks.opnsoc.org/)
 * [Open Parties and Claims repository](https://github.com/thexaero/open-parties-and-claims)
 

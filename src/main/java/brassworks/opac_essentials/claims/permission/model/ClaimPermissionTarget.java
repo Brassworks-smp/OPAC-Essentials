@@ -1,4 +1,4 @@
-package brassworks.opac_essentials.permission;
+package brassworks.opac_essentials.claims.permission.model;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;

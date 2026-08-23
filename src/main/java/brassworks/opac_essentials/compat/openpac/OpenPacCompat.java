@@ -1,4 +1,4 @@
-package brassworks.opac_essentials.compat;
+package brassworks.opac_essentials.compat.openpac;
 
 import com.mojang.logging.LogUtils;
 import net.minecraft.resources.ResourceLocation;

@@ -1,4 +1,4 @@
-package brassworks.opac_essentials.permission;
+package brassworks.opac_essentials.claims.permission.model;
 
 public enum ClaimPermissionAction {
     INTERACT("interact"),

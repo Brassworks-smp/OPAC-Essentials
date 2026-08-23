@@ -1,7 +1,7 @@
-package brassworks.opac_essentials.mixin;
+package brassworks.opac_essentials.mixin.common;
 
-import brassworks.opac_essentials.permission.ClaimPermissionAction;
-import brassworks.opac_essentials.permission.ClaimPermissionService;
+import brassworks.opac_essentials.claims.permission.model.ClaimPermissionAction;
+import brassworks.opac_essentials.claims.permission.server.ClaimPermissionService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.projectile.Projectile;

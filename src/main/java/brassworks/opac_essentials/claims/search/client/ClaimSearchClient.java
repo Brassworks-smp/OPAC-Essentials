@@ -1,4 +1,4 @@
-package brassworks.opac_essentials.client;
+package brassworks.opac_essentials.claims.search.client;
 
 import brassworks.opac_essentials.opac_essentials;
 import com.mojang.logging.LogUtils;

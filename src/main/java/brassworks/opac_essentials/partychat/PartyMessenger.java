@@ -1,4 +1,4 @@
-package brassworks.opac_essentials.utils;
+package brassworks.opac_essentials.partychat;
 
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.logging.LogUtils;

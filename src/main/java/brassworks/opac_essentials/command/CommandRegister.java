@@ -1,7 +1,7 @@
 package brassworks.opac_essentials.command;
 
 import brassworks.opac_essentials.config.CommandConfig;
-import brassworks.opac_essentials.permission.ClaimPermissionTarget;
+import brassworks.opac_essentials.claims.permission.model.ClaimPermissionTarget;
 import com.mojang.logging.LogUtils;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;

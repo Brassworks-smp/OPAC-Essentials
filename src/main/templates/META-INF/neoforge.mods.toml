@@ -10,7 +10,6 @@ updateJSONURL = ""
 displayURL = "https://modrinth.com/modpack/aeroworks-smp-modpack"
 authors = "${mod_authors}"
 description = '''${mod_description}'''
-logoFile="assets/${mod_id}/icons/icon.png"
 
 [[mixins]]
 config = "${mod_id}.mixins.json"

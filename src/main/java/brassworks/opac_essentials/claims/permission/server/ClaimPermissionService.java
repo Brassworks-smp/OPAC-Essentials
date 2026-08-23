@@ -1,6 +1,8 @@
-package brassworks.opac_essentials.permission;
+package brassworks.opac_essentials.claims.permission.server;
 
-import brassworks.opac_essentials.compat.OpenPacCompat;
+import brassworks.opac_essentials.claims.permission.model.ClaimPermissionAction;
+import brassworks.opac_essentials.claims.permission.model.ClaimPermissionTarget;
+import brassworks.opac_essentials.compat.openpac.OpenPacCompat;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;

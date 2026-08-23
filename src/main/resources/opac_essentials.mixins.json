@@ -4,12 +4,13 @@
   "package": "brassworks.opac_essentials.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "OpenPacEventsMixin",
-    "ServerGamePacketListenerMixin"
+    "common.OpenPacEventsMixin",
+    "common.ServerGamePacketListenerMixin"
   ],
   "client": [
-    "XaeroClaimsHighlighterMixin",
-    "XaeroChunkHighlighterMixin"
+    "client.BrassScreenBlurMixin",
+    "client.XaeroClaimsHighlighterMixin",
+    "client.XaeroChunkHighlighterMixin"
   ],
   "injectors": {
     "defaultRequire": 1

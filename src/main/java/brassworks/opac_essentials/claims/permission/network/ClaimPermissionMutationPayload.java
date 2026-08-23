@@ -1,4 +1,4 @@
-package brassworks.opac_essentials.network;
+package brassworks.opac_essentials.claims.permission.network;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
