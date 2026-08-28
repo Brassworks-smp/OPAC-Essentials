@@ -122,14 +122,14 @@ Licensed under the [Apache License 2.0](https://github.com/Brassworks-smp/OPAC-E
 ## Credits
 
 * Development and design by **DerErneuerer**
-* Created for the [Brassworks SMP](https://brassworks.opnsoc.org/)
+* Created for the [Brassworks](https://brassworks.opnsoc.org/)
 * Built as an addon for [Open Parties and Claims](https://github.com/thexaero/open-parties-and-claims)
 
 ## Links
 
 * [Project repository](https://github.com/Brassworks-smp/OPAC-Essentials)
 * [Changelog](https://github.com/Brassworks-smp/OPAC-Essentials/blob/main/changelog.md)
-* [Brassworks SMP website](https://brassworks.opnsoc.org/)
+* [Brassworks Website](https://brassworks.opnsoc.org/)
 * [Open Parties and Claims repository](https://github.com/thexaero/open-parties-and-claims)
 
 <div><img src="https://cdn.modrinth.com/data/cached_images/c6255d91356f6087b95d4973969100dab69defa7_0.webp" alt="Divider"></div>
