@@ -128,7 +128,7 @@ Licensed under the [Apache License 2.0](https://github.com/Brassworks-smp/OPAC-E
 ## Links
 
 * [Project repository](https://github.com/Brassworks-smp/OPAC-Essentials)
-* [Changelog](https://github.com/Brassworks-smp/OPAC-Essentials/changelog.md)
+* [Changelog](https://github.com/Brassworks-smp/OPAC-Essentials/blob/main/changelog.md)
 * [Brassworks SMP website](https://brassworks.opnsoc.org/)
 * [Open Parties and Claims repository](https://github.com/thexaero/open-parties-and-claims)
 
