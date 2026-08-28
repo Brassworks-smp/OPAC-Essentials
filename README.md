@@ -11,9 +11,9 @@ The next generation of OPAC - Better Commands.
 
 </div>
 
-**OPAC - Essentials** is an addon for [Open Parties and Claims](https://github.com/thexaero/open-parties-and-claims), developed for the [Brassworks SMP](https://brassworks.opnsoc.org/). It adds configurable short commands, party chat, fine-grained claim permissions and Xaero's World Map integration for Minecraft 1.21.1.
+**OPAC - Essentials** is an addon for [Open Parties and Claims](https://github.com/thexaero/open-parties-and-claims), developed for the [Brassworks SMP](https://brassworks.opnsoc.org/). It adds configurable short commands, party chat, fine-grained claim permissions and a Xaero's World Map Claim Search integration.
 
-Manage access to individual blocks, block entities, entities and throwable items through an in-game interface or commands. Search for claim owners directly from Xaero's World Map and jump between their claim clusters.
+**The UI on version 2.2 or higher requires KotlinForForge**
 
 ## Legacy Releases
 
@@ -23,26 +23,10 @@ Every release before 2.0 belongs to the legacy generation of the mod. Those rele
 
 * Configurable names for every command added by OPAC - Essentials
 * Short aliases for commonly used OPAC commands
-  * `/claims` for claim management
-  * `/party` for party management
 * Argument-free `/claim` and `/unclaim` commands
-  * `/claim` claims the chunk in which the player is standing
-  * `/unclaim` unclaims the chunk in which the player is standing
-  * Coordinates and additional chunk arguments are intentionally not accepted
 * Party chat with direct messages, toggle and status commands
 * Claim permission interface through `/claims permissions`
-  * Separate rules for main claims and subclaims
-  * Rules for all players or one or more specific players
-  * Search, visual target previews and registry-aware suggestions for modded content
-  * Multi-action, multi-player and bulk editing
-  * Staged changes with a single save step
-  * Management by claim owners and server administrators
-  * Command fallback and automatic migration of legacy grouped rules
 * Claim owner search directly in Xaero's World Map
-  * Centers the map on the first matching claim cluster
-  * Previous and next controls cycle through disconnected claim clusters
-  * The currently selected cluster receives a highly visible outline
-  * Asynchronous cluster calculation reduces client-side lag with large claim counts
 
 ![ui preview](https://cdn.modrinth.com/data/cached_images/07f4e4e81725d49e62d36932ec57c7db6098c064.png)
 
@@ -116,7 +100,7 @@ Claim snapshots and cluster calculations are processed incrementally and asynchr
 
 OPAC - Essentials contains a compatibility layer for both **OPAC API v1 and API v2**. This keeps older supported OPAC releases using API v1 compatible while allowing newer API v2 releases to work without a separate build.
 
-Both the client and server need the mod when using the permission UI and its network features. The Xaero claim search itself is a client-side World Map integration.
+Both the client and server need the mod when using the permission UI and its network features. The client also needs KotlinForForge. The Xaero claim search itself is a client-side World Map integration.
 
 ## Planned Features
 
@@ -127,13 +111,9 @@ The following features are planned and may change during development:
 * More permission targets and actions
 * Party-, rank- and group-based permission rules
 * Permission import, export and advanced migration tools
-* More configuration options and localization support
+* More admin commands to manage Claim/Party related stuff
 
 Roadmap entries are goals, not guarantees. Their scope and release order may change based on testing, OPAC API changes and community feedback.
-
-## Development Status
-
-OPAC - Essentials is under active development and should be treated as experimental software. Please include the Minecraft, NeoForge, OPAC, OPAC - Essentials and Xaero's World Map versions when reporting an issue.
 
 ## License
 
