@@ -22,6 +22,7 @@ public final class ClaimPermissionsSavedData extends SavedData {
     private static final String DATA_NAME = "opac_better_commands_claim_permissions";
     private static final String PERMISSIONS_TAG = "permissions";
     private static final String LEGACY_GROUPS_TAG = "groups";
+    private static final int GLOBAL_SUB_CONFIG_INDEX = -1;
 
     private final Set<ClaimPermissionKey> permissions = new HashSet<>();
 
@@ -53,9 +54,9 @@ public final class ClaimPermissionsSavedData extends SavedData {
                 UUID player = entry.hasUUID("player") ? entry.getUUID("player") : null;
 
                 if (validRule(target, targetId, action)) {
-                    data.permissions.add(new ClaimPermissionKey(
+                    data.permissions.add(normalizePermission(new ClaimPermissionKey(
                             owner, subConfigIndex, target, targetId, action, player
-                    ));
+                    )));
                 }
             } catch (RuntimeException ignored) {
             }
@@ -72,6 +73,17 @@ public final class ClaimPermissionsSavedData extends SavedData {
     }
 
     public boolean add(ClaimPermissionKey permission) {
+        permission = normalizePermission(permission);
+        if (permission.player() != null && permissions.contains(new ClaimPermissionKey(
+                permission.claimOwner(),
+                permission.subConfigIndex(),
+                permission.target(),
+                permission.targetId(),
+                permission.action(),
+                null
+        ))) {
+            return false;
+        }
         boolean changed = permissions.add(permission);
         if (changed) {
             setDirty();
@@ -80,6 +92,7 @@ public final class ClaimPermissionsSavedData extends SavedData {
     }
 
     public boolean remove(ClaimPermissionKey permission) {
+        permission = normalizePermission(permission);
         boolean changed = permissions.remove(permission);
         if (changed) {
             setDirty();
@@ -89,6 +102,7 @@ public final class ClaimPermissionsSavedData extends SavedData {
 
     public boolean allows(UUID owner, int subConfigIndex, ClaimPermissionTarget target,
                           ResourceLocation targetId, ClaimPermissionAction action, UUID player) {
+        subConfigIndex = normalizedSubConfigIndex(subConfigIndex, target, action);
         return permissions.contains(new ClaimPermissionKey(
                 owner, subConfigIndex, target, targetId, action, null
         )) || permissions.contains(new ClaimPermissionKey(
@@ -100,7 +114,8 @@ public final class ClaimPermissionsSavedData extends SavedData {
         List<ClaimPermissionKey> result = new ArrayList<>();
         for (ClaimPermissionKey permission : permissions) {
             if (permission.claimOwner().equals(owner)
-                    && permission.subConfigIndex() == subConfigIndex) {
+                    && (permission.subConfigIndex() == subConfigIndex
+                        || isGlobalPermission(permission))) {
                 result.add(permission);
             }
         }
@@ -145,14 +160,14 @@ public final class ClaimPermissionsSavedData extends SavedData {
                 List<LegacyRule> rules = readLegacyRules(entry);
                 for (UUID member : members) {
                     for (LegacyRule rule : rules) {
-                        migrated |= data.permissions.add(new ClaimPermissionKey(
+                        migrated |= data.permissions.add(normalizePermission(new ClaimPermissionKey(
                                 owner,
                                 subConfigIndex,
                                 rule.target(),
                                 rule.targetId(),
                                 rule.action(),
                                 member
-                        ));
+                        )));
                     }
                 }
             } catch (RuntimeException ignored) {
@@ -208,6 +223,40 @@ public final class ClaimPermissionsSavedData extends SavedData {
                                      ResourceLocation targetId,
                                      ClaimPermissionAction action) {
         return targetId != null && target.supports(action) && target.isRegistered(targetId);
+    }
+
+    private static ClaimPermissionKey normalizePermission(ClaimPermissionKey permission) {
+        int subConfigIndex = normalizedSubConfigIndex(
+                permission.subConfigIndex(),
+                permission.target(),
+                permission.action()
+        );
+        if (subConfigIndex == permission.subConfigIndex()) {
+            return permission;
+        }
+        return new ClaimPermissionKey(
+                permission.claimOwner(),
+                subConfigIndex,
+                permission.target(),
+                permission.targetId(),
+                permission.action(),
+                permission.player()
+        );
+    }
+
+    private static int normalizedSubConfigIndex(int subConfigIndex,
+                                                ClaimPermissionTarget target,
+                                                ClaimPermissionAction action) {
+        return target == ClaimPermissionTarget.TRAIN
+                && action == ClaimPermissionAction.CONTROL
+                ? GLOBAL_SUB_CONFIG_INDEX
+                : subConfigIndex;
+    }
+
+    private static boolean isGlobalPermission(ClaimPermissionKey permission) {
+        return permission.subConfigIndex() == GLOBAL_SUB_CONFIG_INDEX
+                && permission.target() == ClaimPermissionTarget.TRAIN
+                && permission.action() == ClaimPermissionAction.CONTROL;
     }
 
     private record LegacyRule(ClaimPermissionTarget target, ResourceLocation targetId,

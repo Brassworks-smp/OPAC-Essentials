@@ -3,11 +3,11 @@ package brassworks.opac_essentials.claims.permission.server;
 import brassworks.opac_essentials.claims.permission.model.ClaimPermissionAction;
 import brassworks.opac_essentials.claims.permission.model.ClaimPermissionKey;
 import brassworks.opac_essentials.claims.permission.model.ClaimPermissionTarget;
-import brassworks.opac_essentials.compat.openpac.OpenPacCompat;
 import brassworks.opac_essentials.claims.permission.network.ClaimPermissionMutationPayload;
 import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsBatchPayload;
 import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsNetwork;
 import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsSyncPayload;
+import brassworks.opac_essentials.compat.openpac.OpenPacCompat;
 import com.mojang.authlib.GameProfile;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -117,9 +117,8 @@ public final class ClaimPermissionsUiService {
                 int existing = actions.size() - added;
                 if (added == 0) {
                     status = actions.size() == 1
-                            ? "That permission already exists."
-                            : "Those permissions already exist.";
-                    error = true;
+                            ? "Nothing changed. That permission already exists."
+                            : "Nothing changed. Those permissions already exist.";
                 } else if (actions.size() == 1) {
                     status = "Permission added.";
                 } else if (existing == 0) {

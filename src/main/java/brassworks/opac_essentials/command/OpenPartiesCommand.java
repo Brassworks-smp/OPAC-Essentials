@@ -1,6 +1,7 @@
 package brassworks.opac_essentials.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.tree.CommandNode;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 
@@ -12,7 +13,8 @@ public class OpenPartiesCommand {
     }
 
     public void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        var openPacParties = dispatcher.getRoot().getChild("openpac-parties");
+        CommandNode<CommandSourceStack> openPacParties =
+                OpenPacCommandResolver.findParties(dispatcher);
         if (openPacParties != null) {
             dispatcher.register(Commands.literal(commandName).redirect(openPacParties));
         }

@@ -1,10 +1,11 @@
 package brassworks.opac_essentials.claims.permission.client.screen
 
+import brassworks.opac_essentials.claims.permission.client.OpacEssentialsUiTheme
+import brassworks.opac_essentials.claims.permission.model.ClaimPermissionAction
+import brassworks.opac_essentials.claims.permission.model.ClaimPermissionTarget
 import brassworks.opac_essentials.claims.permission.network.ClaimPermissionMutationPayload
 import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsNetwork
 import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsSyncPayload
-import brassworks.opac_essentials.claims.permission.model.ClaimPermissionAction
-import brassworks.opac_essentials.claims.permission.model.ClaimPermissionTarget
 import gg.essential.elementa.components.UIContainer
 import gg.essential.elementa.constraints.CenterConstraint
 import gg.essential.elementa.dsl.basicHeightConstraint
@@ -18,7 +19,6 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.resources.ResourceLocation
 import net.swzo.brass.ui.BrassScreen
-import net.swzo.brass.ui.BrassThemes
 import net.swzo.brass.ui.Colors
 import net.swzo.brass.ui.kit.base.BrassAccent
 import net.swzo.brass.ui.kit.input.BrassButton
@@ -27,14 +27,13 @@ import net.swzo.brass.ui.kit.surface.BrassPanel
 import net.swzo.brass.ui.kit.surface.BrassWindow
 import net.swzo.brass.ui.kit.text.BrassLabel
 import net.swzo.brass.ui.kit.text.BrassTextInput
-import java.awt.Color
 import java.util.EnumSet
 import java.util.Locale
 
 class AddClaimPermissionScreen(
     private val parent: Screen,
     private val payload: ClaimPermissionsSyncPayload,
-) : BrassScreen(backdropColor = Color(22, 14, 11, 148)) {
+) : BrassScreen(backdropColor = OpacEssentialsUiTheme.BACKDROP) {
 
     private var target = ClaimPermissionTarget.BLOCK
     private val selectedActions = EnumSet.of(ClaimPermissionAction.INTERACT)
@@ -51,7 +50,7 @@ class AddClaimPermissionScreen(
     private lateinit var submitButton: BrassButton
 
     init {
-        BrassThemes.apply("mocha")
+        OpacEssentialsUiTheme.apply()
         ClaimPermissionTarget.prepareRegisteredIds()
         buildUi()
         rebuildCategories()
@@ -59,6 +58,7 @@ class AddClaimPermissionScreen(
         refreshTargetSuggestions()
         refreshPlayerSuggestions()
         refreshValidation()
+        OpacEssentialsUiTheme.disableAnimations(background)
     }
 
     private fun buildUi() {
@@ -180,10 +180,12 @@ class AddClaimPermissionScreen(
 
     private fun rebuildCategories() {
         categoryOptions.clearChildren()
-        ClaimPermissionTarget.entries.forEachIndexed { index, option ->
+        val options = ClaimPermissionTarget.availableTargets()
+        val optionWidth = 100f / options.size
+        options.forEachIndexed { index, option ->
             val selected = option == target
             BrassButton(
-                label = ClaimPermissionsScreen.displayName(option.name),
+                label = ClaimPermissionsScreen.displayTargetName(option.name),
                 accent = if (selected) BrassAccent.BRASS else BrassAccent.DEFAULT,
             ) {
                 selectTarget(option)
@@ -191,8 +193,8 @@ class AddClaimPermissionScreen(
                 it.selectable = true
                 it.selected = selected
             }.constrain {
-                x = (index * 25).percent()
-                width = 25.percent() - 3.pixels()
+                x = (index * optionWidth).percent()
+                width = optionWidth.percent() - 3.pixels()
                 height = 20.pixels()
             } childOf categoryOptions
         }
@@ -208,10 +210,14 @@ class AddClaimPermissionScreen(
             selectedActions.add(supported.first())
         }
 
+        val trainId = target.registeredIds().findFirst().orElse(null)
         val currentId = ResourceLocation.tryParse(targetInput.text.trim())
-        if (currentId == null || !target.isRegistered(currentId)) {
-            targetInput.value = ""
+        targetInput.value = when {
+            target == ClaimPermissionTarget.TRAIN && trainId != null -> trainId.toString()
+            currentId == null || !target.isRegistered(currentId) -> ""
+            else -> targetInput.text
         }
+        targetInput.active = target != ClaimPermissionTarget.TRAIN
 
         rebuildCategories()
         rebuildActions()

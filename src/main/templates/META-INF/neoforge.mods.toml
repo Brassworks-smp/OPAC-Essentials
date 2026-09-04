@@ -31,6 +31,13 @@ side = "BOTH"
 [[dependencies."${mod_id}"]]
 modId = "openpartiesandclaims"
 type = "required"
-versionRange = "[0.25.8,)"
+versionRange = "[0.30.0,0.31.0)"
 ordering = "NONE"
+side = "BOTH"
+
+[[dependencies."${mod_id}"]]
+modId = "create"
+type = "optional"
+versionRange = "[6.0.0,6.1.0)"
+ordering = "AFTER"
 side = "BOTH"

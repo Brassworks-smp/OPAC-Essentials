@@ -1,10 +1,9 @@
 package brassworks.opac_essentials.claims.permission.client.modal
 
 import brassworks.opac_essentials.claims.permission.client.screen.ClaimPermissionsScreen
-
-import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsSyncPayload
 import brassworks.opac_essentials.claims.permission.model.ClaimPermissionAction
 import brassworks.opac_essentials.claims.permission.model.ClaimPermissionTarget
+import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsSyncPayload
 import gg.essential.elementa.UIComponent
 import gg.essential.elementa.components.UIContainer
 import gg.essential.elementa.constraints.CenterConstraint
@@ -27,17 +26,19 @@ import java.util.Locale
 
 class AddClaimPermissionModal(
     private val payload: ClaimPermissionsSyncPayload,
+    currentEntries: Collection<PermissionDraftEntry>,
     private val onAdd: (
         PermissionTargetRef,
         List<ClaimPermissionAction>,
         List<PermissionSubject>,
     ) -> Unit,
 ) {
+    private val existingEntries = currentEntries.toList()
     private val modal = BrassModal(
         title = "OPAC",
         width = MODAL_WIDTH,
         height = MODAL_HEIGHT,
-        showClose = true,
+        showClose = false,
         dismissOnEscape = true,
     )
 
@@ -245,7 +246,9 @@ class AddClaimPermissionModal(
 
     private fun rebuildCategories() {
         categoryOptions.clearChildren()
-        ClaimPermissionTarget.entries.forEachIndexed { index, option ->
+        val options = ClaimPermissionTarget.availableTargets()
+        val optionWidth = 100f / options.size
+        options.forEachIndexed { index, option ->
             val selected = option == target
             BrassButton(
                 label = ClaimPermissionsScreen.displayTargetName(option.name),
@@ -256,8 +259,8 @@ class AddClaimPermissionModal(
                 it.selectable = true
                 it.selected = selected
             }.constrain {
-                x = (index * 25).percent()
-                width = 25.percent() - 3.pixels()
+                x = (index * optionWidth).percent()
+                width = optionWidth.percent() - 3.pixels()
                 height = 20.pixels()
             } childOf categoryOptions
         }
@@ -273,10 +276,14 @@ class AddClaimPermissionModal(
             selectedActions.add(supported.first())
         }
 
+        val trainId = target.registeredIds().findFirst().orElse(null)
         val currentId = ResourceLocation.tryParse(targetInput.text.trim())
-        if (currentId == null || !target.isRegistered(currentId)) {
-            targetInput.value = ""
+        targetInput.value = when {
+            target == ClaimPermissionTarget.TRAIN && trainId != null -> trainId.toString()
+            currentId == null || !target.isRegistered(currentId) -> ""
+            else -> targetInput.text
         }
+        targetInput.active = target != ClaimPermissionTarget.TRAIN
 
         rebuildCategories()
         rebuildActions()
@@ -415,11 +422,14 @@ class AddClaimPermissionModal(
             return
         }
 
-        val playerCount = if (allPlayers) 1 else playerNames().size
-        val permissionCount = selectedActions.count { target.supports(it) } * playerCount
-        validationLabel.text = "$permissionCount staged permission changes"
-        validationLabel.tint = Colors.UI_TEXT_DARK
-        submitButton.active = true
+        val permissionCount = newPermissionCount()
+        validationLabel.text = if (permissionCount == 0) {
+            "Nothing new to add. These permissions already exist."
+        } else {
+            "$permissionCount new ${if (permissionCount == 1) "permission" else "permissions"}"
+        }
+        validationLabel.tint = if (permissionCount == 0) Colors.WARN else Colors.UI_TEXT_DARK
+        submitButton.active = permissionCount > 0
     }
 
     private fun validationProblem(): String? {
@@ -437,6 +447,29 @@ class AddClaimPermissionModal(
         .map { it.trim() }
         .filter { it.isNotEmpty() }
         .distinctBy { it.lowercase(Locale.ROOT) }
+
+    private fun newPermissionCount(): Int {
+        val targetId = ResourceLocation.tryParse(targetInput.text.trim()) ?: return 0
+        val targetRef = PermissionTargetRef(target.name, targetId.toString())
+        val subjects = if (allPlayers) {
+            listOf(PermissionSubject.ALL)
+        } else {
+            playerNames().map(::permissionSubject)
+        }
+        return ClaimPermissionsScreen.supportedActions(target)
+            .filter(selectedActions::contains)
+            .sumOf { action ->
+                subjects.count { subject ->
+                    val entry = PermissionDraftEntry(
+                        targetRef.target,
+                        targetRef.targetId,
+                        action.name,
+                        subject,
+                    )
+                    existingEntries.none { it.covers(entry) }
+                }
+            }
+    }
 
     private fun submit() {
         if (validationProblem() != null) {

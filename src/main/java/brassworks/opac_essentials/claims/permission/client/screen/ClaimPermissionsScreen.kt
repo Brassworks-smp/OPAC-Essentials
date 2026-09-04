@@ -1,12 +1,17 @@
 package brassworks.opac_essentials.claims.permission.client.screen
 
-import brassworks.opac_essentials.claims.permission.client.modal.*
-
+import brassworks.opac_essentials.claims.permission.client.OpacEssentialsUiTheme
+import brassworks.opac_essentials.claims.permission.client.modal.AddClaimPermissionModal
+import brassworks.opac_essentials.claims.permission.client.modal.BulkPermissionModal
+import brassworks.opac_essentials.claims.permission.client.modal.PermissionDraftEntry
+import brassworks.opac_essentials.claims.permission.client.modal.PermissionPlayersModal
+import brassworks.opac_essentials.claims.permission.client.modal.PermissionSubject
+import brassworks.opac_essentials.claims.permission.client.modal.PermissionTargetRef
+import brassworks.opac_essentials.claims.permission.model.ClaimPermissionAction
+import brassworks.opac_essentials.claims.permission.model.ClaimPermissionTarget
 import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsBatchPayload
 import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsNetwork
 import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsSyncPayload
-import brassworks.opac_essentials.claims.permission.model.ClaimPermissionAction
-import brassworks.opac_essentials.claims.permission.model.ClaimPermissionTarget
 import gg.essential.elementa.UIComponent
 import gg.essential.elementa.components.ScrollComponent
 import gg.essential.elementa.components.UIContainer
@@ -19,14 +24,11 @@ import gg.essential.elementa.dsl.minus
 import gg.essential.elementa.dsl.percent
 import gg.essential.elementa.dsl.pixels
 import gg.essential.universal.UKeyboard
-import gg.essential.universal.UMatrixStack
 import net.swzo.brass.ui.BrassScreen
-import net.swzo.brass.ui.BrassThemes
 import net.swzo.brass.ui.Colors
 import net.swzo.brass.ui.kit.base.BrassAccent
+import net.swzo.brass.ui.kit.base.BrassChrome
 import net.swzo.brass.ui.kit.base.BrassDismissable
-import net.swzo.brass.ui.kit.base.BrassEased
-import net.swzo.brass.ui.kit.base.BrassWidget
 import net.swzo.brass.ui.kit.input.BrassButton
 import net.swzo.brass.ui.kit.input.BrassCheckbox
 import net.swzo.brass.ui.kit.input.BrassSearchField
@@ -41,15 +43,13 @@ import net.swzo.brass.ui.kit.surface.BrassModal
 import net.swzo.brass.ui.kit.surface.BrassPanel
 import net.swzo.brass.ui.kit.surface.BrassWindow
 import net.swzo.brass.ui.kit.text.BrassLabel
-import net.swzo.brass.ui.kit.text.BrassTextField
 import org.lwjgl.glfw.GLFW
-import java.awt.Color
 import java.util.LinkedHashMap
 import java.util.Locale
 
 class ClaimPermissionsScreen(
     initialPayload: ClaimPermissionsSyncPayload,
-) : BrassScreen(backdropColor = Color(8, 9, 10, 148)) {
+) : BrassScreen(backdropColor = OpacEssentialsUiTheme.BACKDROP) {
     private var payload = initialPayload
     private var serverEntries = entriesFromPayload(initialPayload)
     private var draftEntries = LinkedHashMap(serverEntries)
@@ -61,10 +61,9 @@ class ClaimPermissionsScreen(
 
     private val permissionCheckboxes = mutableMapOf<PermissionSlot, BrassCheckbox>()
     private val targetTiles = mutableMapOf<TargetKey, BrassButton>()
-
     private lateinit var targetContent: UIContainer
     private lateinit var detailHost: UIContainer
-    private lateinit var detailContent: DetailTransitionLayer
+    private lateinit var detailContent: UIContainer
     private lateinit var statusLabel: BrassLabel
     private lateinit var doneButton: BrassButton
     private lateinit var addButton: BrassButton
@@ -72,10 +71,11 @@ class ClaimPermissionsScreen(
     private lateinit var frame: BrassWindow
 
     init {
-        BrassThemes.apply("dark", "#C45CFF")
+        OpacEssentialsUiTheme.apply()
         buildUi()
         refreshTargets(selectFirst = true)
         refreshStatus()
+        OpacEssentialsUiTheme.disableAnimations(background)
     }
 
     private fun buildUi() {
@@ -90,10 +90,10 @@ class ClaimPermissionsScreen(
             x = CenterConstraint()
             y = CenterConstraint()
             width = basicWidthConstraint { component ->
-                minOf(WINDOW_WIDTH, (component.parent.getWidth() - 20f).coerceAtLeast(MIN_WINDOW_WIDTH))
+                minOf(WINDOW_WIDTH, (component.parent.getWidth() - 28f).coerceAtLeast(MIN_WINDOW_WIDTH))
             }
             height = basicHeightConstraint { component ->
-                minOf(WINDOW_HEIGHT, (component.parent.getHeight() - 16f).coerceAtLeast(MIN_WINDOW_HEIGHT))
+                minOf(WINDOW_HEIGHT, (component.parent.getHeight() - 24f).coerceAtLeast(MIN_WINDOW_HEIGHT))
             }
         } childOf background
 
@@ -101,7 +101,7 @@ class ClaimPermissionsScreen(
             it.entranceEnabled = false
         }.constrain {
             x = 7.pixels(true)
-            y = 5.pixels()
+            y = 4.pixels()
             width = 18.pixels()
             height = 10.pixels()
         } childOf frame
@@ -137,7 +137,7 @@ class ClaimPermissionsScreen(
         }
 
         addButton = BrassButton("+ Add", BrassAccent.BRASS) {
-            AddClaimPermissionModal(payload, ::stageAddedPermission).show(background)
+            openAddPermission()
         }.constrain {
             x = 100.percent() - 146.pixels()
             y = 10.pixels()
@@ -161,7 +161,7 @@ class ClaimPermissionsScreen(
             x = 12.pixels()
             y = 38.pixels()
             width = 100.percent() - 24.pixels()
-            height = 98.pixels()
+            height = 90.pixels()
         } childOf content
 
         val targetScroll = ScrollComponent(
@@ -175,7 +175,7 @@ class ClaimPermissionsScreen(
 
         targetContent = UIContainer().constrain {
             width = basicWidthConstraint { component ->
-                maxOf(component.parent.getWidth(), visibleTargets.size * TARGET_STEP)
+                maxOf(component.parent.getWidth(), 4f + visibleTargets.size * TARGET_STEP)
             }
             height = 100.percent()
         } childOf targetScroll
@@ -185,12 +185,12 @@ class ClaimPermissionsScreen(
             layout = BrassPanel.Layout.FREE,
         ).constrain {
             x = 12.pixels()
-            y = 144.pixels()
+            y = 136.pixels()
             width = 100.percent() - 24.pixels()
-            height = 100.percent() - 180.pixels()
+            height = 100.percent() - 172.pixels()
         } childOf content
         detailHost = detailPanel.content
-        detailContent = DetailTransitionLayer(0f).constrain {
+        detailContent = UIContainer().constrain {
             width = 100.percent()
             height = 100.percent()
         } childOf detailHost
@@ -227,7 +227,7 @@ class ClaimPermissionsScreen(
             setInteractive(true)
             refreshTargets(selectFirst = selectedKey == null)
             refreshStatus()
-            if (shouldClose) frame.requestClose()
+            if (shouldClose) finishClose()
             return
         }
 
@@ -241,8 +241,7 @@ class ClaimPermissionsScreen(
     ) {
         if (
             keyCode == GLFW.GLFW_KEY_ESCAPE &&
-            !hasDescendant(window) { it is BrassDismissable } &&
-            !hasDescendant(window) { it is BrassTextField && it.focused }
+            !hasDescendant(window) { it is BrassDismissable }
         ) {
             requestClose()
             return
@@ -251,10 +250,18 @@ class ClaimPermissionsScreen(
     }
 
     private fun refreshTargets(selectFirst: Boolean) {
-        val previousSelection = selectedKey
         updateVisibleTargets(selectFirst)
         rebuildTargetStrip()
-        rebuildDetails(if (previousSelection != null && previousSelection != selectedKey) 10f else 0f)
+        rebuildDetails()
+    }
+
+    private fun openAddPermission() {
+        if (savingChanges) return
+        AddClaimPermissionModal(
+            payload,
+            draftEntries.values.toList(),
+            ::stageAddedPermission,
+        ).show(background)
     }
 
     private fun updateVisibleTargets(selectFirst: Boolean) {
@@ -289,7 +296,12 @@ class ClaimPermissionsScreen(
                 BrassIcons.SEARCH,
                 "No permission targets",
                 if (query.isEmpty()) "Add a target to get started" else "Try a shorter search term",
-            ).constrain {
+            ).also {
+                it.chrome = BrassChrome.FLAT
+                it.clickable = true
+                it.entranceEnabled = false
+                it.onMouseClick { openAddPermission() }
+            }.constrain {
                 width = 100.percent()
                 height = 100.percent()
             } childOf targetContent
@@ -304,58 +316,74 @@ class ClaimPermissionsScreen(
             label = "",
             accent = if (selected) BrassAccent.BRASS else BrassAccent.DEFAULT,
         ) {
-            if (selectedKey != group.key) {
-                val oldIndex = visibleTargets.indexOfFirst { it.key == selectedKey }
-                val newIndex = visibleTargets.indexOfFirst { it.key == group.key }
+            if (!savingChanges && selectedKey != group.key) {
                 selectedKey = group.key
                 syncTargetTileSelection()
-                rebuildDetails(if (newIndex >= oldIndex) 10f else -10f)
+                rebuildDetails()
             }
         }.also {
             it.selectable = true
             it.selected = selected
+            it.chrome = BrassChrome.FLAT
+            it.centered = false
+            it.entranceEnabled = false
+            it.clickable = false
         }.constrain {
-            x = (index * TARGET_STEP).pixels()
+            x = (2f + index * TARGET_STEP).pixels()
             y = 1.pixels()
             width = TARGET_WIDTH.pixels()
-            height = 64.pixels()
+            height = TARGET_HEIGHT.pixels()
         } childOf targetContent
         targetTiles[group.key] = tile
+
+        val content = UIContainer().constrain {
+            x = 3.pixels()
+            y = 3.pixels()
+            width = 100.percent() - 6.pixels()
+            height = 100.percent() - 6.pixels()
+        } childOf tile
 
         when (parseTarget(group.key.target)) {
             ClaimPermissionTarget.BLOCK,
             ClaimPermissionTarget.BLOCK_ENTITY -> BrassBlockPreview(group.key.targetId, tooltip = true).constrain {
                 x = CenterConstraint()
-                y = 3.pixels()
-                width = 27.pixels()
-                height = 27.pixels()
-            } childOf tile
+                y = 0.pixels()
+                width = 25.pixels()
+                height = 25.pixels()
+            } childOf content
 
             ClaimPermissionTarget.ENTITY -> BrassEntity(group.key.targetId, tooltip = true).constrain {
                 x = CenterConstraint()
-                y = 2.pixels()
-                width = 29.pixels()
-                height = 29.pixels()
-            } childOf tile
+                y = 0.pixels()
+                width = 27.pixels()
+                height = 27.pixels()
+            } childOf content
+
+            ClaimPermissionTarget.TRAIN -> BrassItem(TRAIN_ICON_ITEM, tooltip = true).constrain {
+                x = CenterConstraint()
+                y = 0.pixels()
+                width = 25.pixels()
+                height = 25.pixels()
+            } childOf content
 
             ClaimPermissionTarget.THROWABLE -> BrassItem(group.key.targetId, tooltip = true).constrain {
                 x = CenterConstraint()
-                y = 4.pixels()
+                y = 1.pixels()
                 width = 25.pixels()
                 height = 25.pixels()
-            } childOf tile
+            } childOf content
         }
 
-        BrassLabel(shortTargetName(group.key.targetId), Colors.UI_TEXT).constrain {
+        BrassLabel(targetDisplayName(group.key), Colors.UI_TEXT).constrain {
             x = CenterConstraint()
-            y = 38.pixels()
-        } childOf tile
+            y = 31.pixels()
+        } childOf content
 
         BrassLabel(tileSummary(group), Colors.UI_TEXT_DARK, scale = 0.7f).constrain {
             x = CenterConstraint()
-            y = 52.pixels()
-        } childOf tile
-        disableEntrances(tile)
+            y = 44.pixels()
+        } childOf content
+        OpacEssentialsUiTheme.disableAnimations(tile)
     }
 
     private fun syncTargetTileSelection() {
@@ -366,14 +394,9 @@ class ClaimPermissionsScreen(
         }
     }
 
-    private fun disableEntrances(component: UIComponent) {
-        if (component is BrassWidget) component.entranceEnabled = false
-        component.children.forEach(::disableEntrances)
-    }
-
-    private fun rebuildDetails(slideFrom: Float = 0f) {
+    private fun rebuildDetails() {
         val previous = detailContent
-        detailContent = DetailTransitionLayer(slideFrom).constrain {
+        detailContent = UIContainer().constrain {
             width = 100.percent()
             height = 100.percent()
         } childOf detailHost
@@ -387,11 +410,16 @@ class ClaimPermissionsScreen(
                 BrassIcons.INFO,
                 "Select a target",
                 "Its actions and players will appear here",
-            ).constrain {
+            ).also {
+                it.chrome = BrassChrome.FLAT
+                it.clickable = true
+                it.entranceEnabled = false
+                it.onMouseClick { openAddPermission() }
+            }.constrain {
                 width = 100.percent()
                 height = 100.percent()
             } childOf detailContent
-            disableEntrances(detailContent)
+            OpacEssentialsUiTheme.disableAnimations(detailContent)
             return
         }
 
@@ -450,7 +478,7 @@ class ClaimPermissionsScreen(
         permissions.constrain {
             height = basicHeightConstraint { permissions.contentHeight() }
         }
-        disableEntrances(detailContent)
+        OpacEssentialsUiTheme.disableAnimations(detailContent)
     }
 
     private fun addLargePreview(key: TargetKey) {
@@ -462,6 +490,15 @@ class ClaimPermissionsScreen(
             } childOf detailContent
 
             ClaimPermissionTarget.ENTITY -> BrassEntity(key.targetId, spin = 12f, tooltip = true).constrain {
+                width = 38.pixels()
+                height = 36.pixels()
+            } childOf detailContent
+
+            ClaimPermissionTarget.TRAIN -> BrassBlockPreview(
+                TRAIN_ICON_ITEM,
+                spin = 12f,
+                tooltip = true,
+            ).constrain {
                 width = 38.pixels()
                 height = 36.pixels()
             } childOf detailContent
@@ -480,12 +517,8 @@ class ClaimPermissionsScreen(
         action: ClaimPermissionAction,
     ): UIContainer {
         val slot = PermissionSlot(group.key, action)
-        val subjects = group.subjects()
-        val enabledCount = group.entries
-            .filter { it.action == action.name }
-            .map { it.subject.key() }
-            .distinct()
-            .size
+        val subjects = group.effectiveSubjects()
+        val enabledCount = subjects.count { group.hasAction(it, action) }
         val row = UIContainer()
         val checkbox = BrassCheckbox(
             initial = subjects.isNotEmpty() && enabledCount == subjects.size,
@@ -525,7 +558,7 @@ class ClaimPermissionsScreen(
         enabled: Boolean,
     ) {
         if (enabled) {
-            group.subjects().forEach { subject ->
+            group.effectiveSubjects().forEach { subject ->
                 putDraft(PermissionDraftEntry(
                     group.key.target,
                     group.key.targetId,
@@ -547,7 +580,7 @@ class ClaimPermissionsScreen(
             title = "Remove permission target?",
             width = 318f,
             height = 128f,
-            showClose = true,
+            showClose = false,
             dismissOnEscape = true,
         )
         confirmation.body { host ->
@@ -575,7 +608,7 @@ class ClaimPermissionsScreen(
             title = "Delete permission target?",
             width = 318f,
             height = 128f,
-            showClose = true,
+            showClose = false,
             dismissOnEscape = true,
         )
         confirmation.body { host ->
@@ -606,11 +639,6 @@ class ClaimPermissionsScreen(
         actions: List<ClaimPermissionAction>,
         subjects: List<PermissionSubject>,
     ) {
-        if (subjects.any(PermissionSubject::isAll)) {
-            actions.forEach { action ->
-                removeNamedEntries(target, action)
-            }
-        }
         actions.forEach { action ->
             subjects.forEach { subject ->
                 putDraft(PermissionDraftEntry(target.target, target.targetId, action.name, subject))
@@ -623,19 +651,18 @@ class ClaimPermissionsScreen(
 
     private fun applyPlayers(key: TargetKey, subjects: List<PermissionSubject>) {
         val group = groupedTargets().firstOrNull { it.key == key } ?: return
-        val currentSubjects = group.subjects()
+        val currentSubjects = group.effectiveSubjects()
         val commonActions = supportedActions(parseTarget(key.target)).filter { action ->
-            group.entries.count { it.action == action.name } == currentSubjects.size
+            currentSubjects.all { group.hasAction(it, action) }
         }
         val fallbackActions = group.entries.map { parseAction(it.action) }.distinct()
         val inheritedActions = commonActions.ifEmpty { fallbackActions }
-        val selectedKeys = subjects.map(PermissionSubject::key).toSet()
-
         draftEntries.entries.removeIf { (_, entry) ->
-            entry.targetRef() == key.toRef() && entry.subject.key() !in selectedKeys
+            entry.targetRef() == key.toRef() &&
+                subjects.none { it.matches(entry.subject) }
         }
         subjects.forEach { subject ->
-            if (group.entries.none { it.subject.key() == subject.key() }) {
+            if (group.entries.none { it.subject.matches(subject) }) {
                 inheritedActions.forEach { action ->
                     putDraft(PermissionDraftEntry(key.target, key.targetId, action.name, subject))
                 }
@@ -660,13 +687,12 @@ class ClaimPermissionsScreen(
             actions.filter(parseTarget(target.target)::supports).forEach { action ->
                 subjects.forEach { subject ->
                     if (enabled) {
-                        if (subject.isAll) removeNamedEntries(target, action)
                         putDraft(PermissionDraftEntry(target.target, target.targetId, action.name, subject))
                     } else {
                         draftEntries.entries.removeIf { (_, entry) ->
                             entry.targetRef() == target &&
                                     entry.action == action.name &&
-                                    entry.subject.key() == subject.key()
+                                    (subject.isAll || entry.subject.matches(subject))
                         }
                     }
                 }
@@ -676,27 +702,30 @@ class ClaimPermissionsScreen(
         refreshStatus()
     }
 
-    private fun removeNamedEntries(target: PermissionTargetRef, action: ClaimPermissionAction) {
-        draftEntries.entries.removeIf { (_, entry) ->
-            entry.targetRef() == target && entry.action == action.name && !entry.subject.isAll
-        }
-    }
-
     private fun putDraft(entry: PermissionDraftEntry) {
-        draftEntries[entry.key()] = entry
+        val canonicalSubject = draftEntries.values
+            .firstOrNull {
+                it.targetRef() == entry.targetRef() &&
+                    it.subject.matches(entry.subject)
+            }
+            ?.subject
+            ?: entry.subject
+        val normalizedEntry = entry.copy(subject = canonicalSubject)
+        if (draftEntries.values.any { it.covers(normalizedEntry) }) {
+            return
+        }
+        draftEntries[normalizedEntry.key()] = normalizedEntry
     }
 
     private fun saveChanges(closeAfter: Boolean) {
         if (savingChanges) return
-        val removed = serverEntries.filterKeys { it !in draftEntries }
-            .values
+        val removed = pendingRemovals()
             .map { it.networkEntry(false) }
-        val added = draftEntries.filterKeys { it !in serverEntries }
-            .values
+        val added = pendingAdditions()
             .map { it.networkEntry(true) }
         val changes = removed + added
         if (changes.isEmpty()) {
-            if (closeAfter) frame.requestClose()
+            if (closeAfter) finishClose()
             return
         }
 
@@ -719,18 +748,18 @@ class ClaimPermissionsScreen(
 
     private fun requestClose() {
         if (!isDirty()) {
-            frame.requestClose()
+            finishClose()
             return
         }
         val confirmation = BrassModal(
-            title = "Unsaved permission changes",
+            title = "Are you sure?",
             width = 336f,
             height = 132f,
-            showClose = true,
+            showClose = false,
             dismissOnEscape = true,
         )
         confirmation.body { host ->
-            BrassLabel("Save your staged permission changes before closing?", Colors.UI_TEXT).constrain {
+            BrassLabel("You have unsaved permission changes.", Colors.UI_TEXT).constrain {
                 x = 3.pixels()
                 y = 14.pixels()
             } childOf host
@@ -743,7 +772,7 @@ class ClaimPermissionsScreen(
             BrassButton("Cancel") { confirmation.dismiss() },
             BrassButton("Discard", BrassAccent.DANGER) {
                 confirmation.dismiss()
-                frame.requestClose()
+                finishClose()
             },
             BrassButton("Save", BrassAccent.BRASS) {
                 confirmation.dismiss()
@@ -760,19 +789,30 @@ class ClaimPermissionsScreen(
         addButton.active = active
         bulkButton.active = active
         doneButton.active = active
-        permissionCheckboxes.values.forEach { it.active = active }
         targetTiles.values.forEach { it.active = active }
+        permissionCheckboxes.values.forEach { it.active = active }
     }
 
-    private fun isDirty(): Boolean = serverEntries.keys != draftEntries.keys
+    private fun isDirty(): Boolean = pendingChangeCount() > 0
+
+    private fun pendingRemovals(): List<PermissionDraftEntry> =
+        serverEntries.values.filter { serverEntry ->
+            draftEntries.values.none { it.matches(serverEntry) }
+        }
+
+    private fun pendingAdditions(): List<PermissionDraftEntry> =
+        draftEntries.values.filter { draftEntry ->
+            serverEntries.values.none { it.matches(draftEntry) }
+        }
+
+    private fun pendingChangeCount(): Int = pendingRemovals().size + pendingAdditions().size
 
     private fun hasDescendant(root: UIComponent, predicate: (UIComponent) -> Boolean): Boolean =
         root.children.any { child -> predicate(child) || hasDescendant(child, predicate) }
 
     private fun refreshStatus() {
         val targetCount = draftEntries.values.map(PermissionDraftEntry::targetRef).distinct().size
-        val changeCount = serverEntries.keys.subtract(draftEntries.keys).size +
-                draftEntries.keys.subtract(serverEntries.keys).size
+        val changeCount = pendingChangeCount()
         val scope = if (payload.adminOverride()) {
             "Admin · ${payload.claimOwnerName()}"
         } else {
@@ -800,10 +840,17 @@ class ClaimPermissionsScreen(
         return if (readable.length <= 15) readable else readable.take(14) + "…"
     }
 
+    private fun targetDisplayName(key: TargetKey): String =
+        if (parseTarget(key.target) == ClaimPermissionTarget.TRAIN) {
+            "Trains"
+        } else {
+            shortTargetName(key.targetId)
+        }
+
     private fun tileSummary(group: TargetGroup): String {
-        val supported = supportedActions(parseTarget(group.key.target)).size
-        val enabled = group.entries.map { it.action }.distinct().size
-        val actionText = if (enabled == supported) "All" else "$enabled/$supported"
+        val actions = supportedActions(parseTarget(group.key.target))
+        val enabled = actions.count(group::hasActionForAll)
+        val actionText = if (enabled == actions.size) "All" else "$enabled/${actions.size}"
         return "$actionText · ${subjectSummary(group)}"
     }
 
@@ -827,9 +874,29 @@ class ClaimPermissionsScreen(
         val key: TargetKey,
         val entries: List<PermissionDraftEntry>,
     ) {
-        fun subjects(): List<PermissionSubject> = entries
-            .map(PermissionDraftEntry::subject)
-            .distinctBy(PermissionSubject::key)
+        fun subjects(): List<PermissionSubject> = buildList {
+            entries.map(PermissionDraftEntry::subject).forEach { subject ->
+                if (none { it.matches(subject) }) add(subject)
+            }
+        }
+
+        fun effectiveSubjects(): List<PermissionSubject> {
+            val subjects = subjects()
+            return if (subjects.any(PermissionSubject::isAll)) {
+                listOf(PermissionSubject.ALL)
+            } else {
+                subjects
+            }
+        }
+
+        fun hasAction(subject: PermissionSubject, action: ClaimPermissionAction): Boolean =
+            entries.any {
+                it.action == action.name &&
+                    it.subject.matches(subject)
+            }
+
+        fun hasActionForAll(action: ClaimPermissionAction): Boolean =
+            effectiveSubjects().all { hasAction(it, action) }
     }
 
     private data class PermissionSlot(
@@ -837,31 +904,16 @@ class ClaimPermissionsScreen(
         val action: ClaimPermissionAction,
     )
 
-    private class DetailTransitionLayer(slideFrom: Float) : UIContainer() {
-        private val slide = BrassEased(slideFrom, speed = 20f).apply {
-            target = 0f
-        }
-
-        override fun draw(matrixStack: UMatrixStack) {
-            val offset = slide.advance()
-            matrixStack.push()
-            matrixStack.translate(offset, 0f, 0f)
-            try {
-                super.draw(matrixStack)
-            } finally {
-                matrixStack.pop()
-            }
-        }
-    }
-
     companion object {
-        private const val WINDOW_WIDTH = 640f
-        private const val WINDOW_HEIGHT = 400f
+        private const val WINDOW_WIDTH = 600f
+        private const val WINDOW_HEIGHT = 360f
         private const val MIN_WINDOW_WIDTH = 270f
         private const val MIN_WINDOW_HEIGHT = 180f
-        private const val MIN_CONTENT_HEIGHT = 300f
-        private const val TARGET_WIDTH = 96f
-        private const val TARGET_STEP = 104f
+        private const val MIN_CONTENT_HEIGHT = 270f
+        private const val TARGET_WIDTH = 90f
+        private const val TARGET_HEIGHT = 58f
+        private const val TARGET_STEP = 96f
+        private const val TRAIN_ICON_ITEM = "create:track"
 
         private fun entriesFromPayload(
             payload: ClaimPermissionsSyncPayload,
@@ -873,7 +925,15 @@ class ClaimPermissionsScreen(
 
         @JvmStatic
         fun supportedActions(target: ClaimPermissionTarget): List<ClaimPermissionAction> =
-            ClaimPermissionAction.entries.filter(target::supports)
+            if (target == ClaimPermissionTarget.TRAIN) {
+                listOf(
+                    ClaimPermissionAction.TRAVEL,
+                    ClaimPermissionAction.INTERACT,
+                    ClaimPermissionAction.CONTROL,
+                )
+            } else {
+                ClaimPermissionAction.entries.filter(target::supports)
+            }
 
         @JvmStatic
         fun parseTarget(name: String): ClaimPermissionTarget =
@@ -894,6 +954,7 @@ class ClaimPermissionsScreen(
 
         @JvmStatic
         fun displayTargetName(enumName: String): String = when (parseTarget(enumName)) {
+            ClaimPermissionTarget.TRAIN -> "Trains"
             ClaimPermissionTarget.THROWABLE -> "Thrown item"
             ClaimPermissionTarget.BLOCK_ENTITY -> "Block entity"
             else -> displayName(enumName)

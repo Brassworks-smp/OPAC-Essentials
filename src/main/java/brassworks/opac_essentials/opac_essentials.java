@@ -1,9 +1,9 @@
 package brassworks.opac_essentials;
 
-import brassworks.opac_essentials.command.CommandRegister;
-import brassworks.opac_essentials.config.CommandConfig;
-import brassworks.opac_essentials.partychat.PartyChatListener;
 import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsNetwork;
+import brassworks.opac_essentials.command.CommandRegister;
+import brassworks.opac_essentials.config.EssentialsConfig;
+import brassworks.opac_essentials.partychat.PartyChatListener;
 import com.mojang.logging.LogUtils;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
@@ -28,8 +28,8 @@ public final class opac_essentials {
     public opac_essentials(IEventBus modEventBus, ModContainer modContainer) {
         modContainer.registerConfig(
                 ModConfig.Type.COMMON,
-                CommandConfig.SPEC,
-                "opac_essentials-commands.toml"
+                EssentialsConfig.SPEC,
+                "opac_essentials.toml"
         );
         modEventBus.addListener(ClaimPermissionsNetwork::register);
         NeoForge.EVENT_BUS.register(this);
