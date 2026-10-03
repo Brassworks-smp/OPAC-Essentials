@@ -19,7 +19,7 @@ public record ClaimPermissionsBatchPayload(
         List<String> actions,
         List<String> players
 ) implements CustomPacketPayload {
-    private static final int MAX_TARGETS = 4096;
+    public static final int MAX_TARGETS = 8192;
     private static final int MAX_ACTIONS = 16;
     private static final int MAX_PLAYERS = 128;
 
@@ -75,7 +75,7 @@ public record ClaimPermissionsBatchPayload(
                     buffer.writeVarInt(payload.subConfigIndex());
                     buffer.writeBoolean(payload.enabled());
 
-                    int targetCount = Math.min(payload.targets().size(), MAX_TARGETS);
+                    int targetCount = checkedSize(payload.targets().size(), MAX_TARGETS, "target");
                     buffer.writeVarInt(targetCount);
                     for (int index = 0; index < targetCount; index++) {
                         payload.targets().get(index).encode(buffer);

@@ -21,8 +21,9 @@ public abstract class OpenPacCreatePermissionsMixin {
             int entityId, InteractionHand hand, ServerPlayer player,
             CallbackInfoReturnable<Boolean> callback
     ) {
-        if (ClaimPermissionService.allowsTrainInteraction(entityId, player)) {
-            callback.setReturnValue(true);
+        Boolean allowed = ClaimPermissionService.trainInteractionPermission(entityId, player);
+        if (allowed != null) {
+            callback.setReturnValue(allowed);
         }
     }
 
@@ -43,8 +44,9 @@ public abstract class OpenPacCreatePermissionsMixin {
             }
             return;
         }
-        if (ClaimPermissionService.allowsTrainInteraction(entityId, player)) {
-            callback.setReturnValue(true);
+        Boolean allowed = ClaimPermissionService.trainInteractionPermission(entityId, player);
+        if (allowed != null) {
+            callback.setReturnValue(allowed);
         }
     }
 

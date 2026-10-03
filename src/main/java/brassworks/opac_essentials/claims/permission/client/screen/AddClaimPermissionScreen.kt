@@ -1,5 +1,6 @@
 package brassworks.opac_essentials.claims.permission.client.screen
 
+import brassworks.opac_essentials.client.ResponsiveBrassScreen
 import brassworks.opac_essentials.claims.permission.client.OpacEssentialsUiTheme
 import brassworks.opac_essentials.claims.permission.model.ClaimPermissionAction
 import brassworks.opac_essentials.claims.permission.model.ClaimPermissionTarget
@@ -8,8 +9,6 @@ import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsNetw
 import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsSyncPayload
 import gg.essential.elementa.components.UIContainer
 import gg.essential.elementa.constraints.CenterConstraint
-import gg.essential.elementa.dsl.basicHeightConstraint
-import gg.essential.elementa.dsl.basicWidthConstraint
 import gg.essential.elementa.dsl.childOf
 import gg.essential.elementa.dsl.constrain
 import gg.essential.elementa.dsl.minus
@@ -18,11 +17,13 @@ import gg.essential.elementa.dsl.pixels
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.resources.ResourceLocation
-import net.swzo.brass.ui.BrassScreen
+import net.swzo.brass.ui.BrassThemes
 import net.swzo.brass.ui.Colors
 import net.swzo.brass.ui.kit.base.BrassAccent
+import net.swzo.brass.ui.kit.base.BrassChrome
 import net.swzo.brass.ui.kit.input.BrassButton
 import net.swzo.brass.ui.kit.input.BrassCheckbox
+import net.swzo.brass.ui.kit.input.BrassTabSwitch
 import net.swzo.brass.ui.kit.surface.BrassPanel
 import net.swzo.brass.ui.kit.surface.BrassWindow
 import net.swzo.brass.ui.kit.text.BrassLabel
@@ -33,12 +34,21 @@ import java.util.Locale
 class AddClaimPermissionScreen(
     private val parent: Screen,
     private val payload: ClaimPermissionsSyncPayload,
-) : BrassScreen(backdropColor = OpacEssentialsUiTheme.BACKDROP) {
+) : ResponsiveBrassScreen(
+    WINDOW_WIDTH,
+    WINDOW_HEIGHT,
+    WINDOW_HORIZONTAL_MARGIN,
+    WINDOW_VERTICAL_MARGIN,
+    OpacEssentialsUiTheme.BACKDROP,
+) {
 
     private var target = ClaimPermissionTarget.BLOCK
     private val selectedActions = EnumSet.of(ClaimPermissionAction.INTERACT)
     private val actionCheckboxes = mutableMapOf<ClaimPermissionAction, BrassCheckbox>()
     private var saving = false
+    private lateinit var previousThemeId: String
+    private var previousAccentHex: String? = null
+    private var themeApplied = false
 
     private lateinit var categoryOptions: UIContainer
     private lateinit var targetInput: BrassTextInput
@@ -49,7 +59,13 @@ class AddClaimPermissionScreen(
     private lateinit var validationLabel: BrassLabel
     private lateinit var submitButton: BrassButton
 
-    init {
+    override fun afterInitialization() {
+        super.afterInitialization()
+        if (!themeApplied) {
+            previousThemeId = BrassThemes.currentId
+            previousAccentHex = BrassThemes.accentHex
+            themeApplied = true
+        }
         OpacEssentialsUiTheme.apply()
         ClaimPermissionTarget.prepareRegisteredIds()
         buildUi()
@@ -61,10 +77,17 @@ class AddClaimPermissionScreen(
         OpacEssentialsUiTheme.disableAnimations(background)
     }
 
+    override fun onScreenClose() {
+        super.onScreenClose()
+        if (themeApplied) {
+            BrassThemes.apply(previousThemeId, previousAccentHex)
+        }
+    }
+
     private fun buildUi() {
         val frame = BrassWindow(
-            title = "OPAC / Claims",
-            subtitle = "Add permission",
+            title = "OPAC",
+            subtitle = "Claims  /  Permissions  /  Add",
             onClose = ::returnToParent,
             controls = false,
             minW = 340f,
@@ -72,12 +95,8 @@ class AddClaimPermissionScreen(
         ).constrain {
             x = CenterConstraint()
             y = CenterConstraint()
-            width = basicWidthConstraint { component ->
-                minOf(WINDOW_WIDTH, (component.parent.getWidth() - 32f).coerceAtLeast(320f))
-            }
-            height = basicHeightConstraint { component ->
-                minOf(WINDOW_HEIGHT, (component.parent.getHeight() - 24f).coerceAtLeast(310f))
-            }
+            width = responsiveWindowWidthConstraint()
+            height = responsiveWindowHeightConstraint()
         } childOf background
 
         BrassLabel("Add permissions to ${payload.scopeName()}", Colors.UI_TEXT_DARK).constrain {
@@ -181,23 +200,21 @@ class AddClaimPermissionScreen(
     private fun rebuildCategories() {
         categoryOptions.clearChildren()
         val options = ClaimPermissionTarget.availableTargets()
-        val optionWidth = 100f / options.size
-        options.forEachIndexed { index, option ->
-            val selected = option == target
-            BrassButton(
-                label = ClaimPermissionsScreen.displayTargetName(option.name),
-                accent = if (selected) BrassAccent.BRASS else BrassAccent.DEFAULT,
-            ) {
-                selectTarget(option)
-            }.also {
-                it.selectable = true
-                it.selected = selected
-            }.constrain {
-                x = (index * optionWidth).percent()
-                width = optionWidth.percent() - 3.pixels()
-                height = 20.pixels()
-            } childOf categoryOptions
-        }
+        BrassTabSwitch(
+            options = options.map { ClaimPermissionsScreen.displayTargetName(it.name) },
+            initialIndex = options.indexOf(target).coerceAtLeast(0),
+            equalWidths = true,
+        ) { index ->
+            selectTarget(options[index])
+        }.also { tabs ->
+            tabs.children.filterIsInstance<BrassButton>().forEach { button ->
+                button.chrome = BrassChrome.FLAT
+            }
+        }.constrain {
+            width = 100.percent() -
+                    (options.size - 1).coerceAtLeast(0).pixels()
+            height = 20.pixels()
+        } childOf categoryOptions
     }
 
     private fun selectTarget(option: ClaimPermissionTarget) {
@@ -219,7 +236,6 @@ class AddClaimPermissionScreen(
         }
         targetInput.active = target != ClaimPermissionTarget.TRAIN
 
-        rebuildCategories()
         rebuildActions()
         refreshTargetSuggestions()
         refreshValidation()
@@ -383,6 +399,8 @@ class AddClaimPermissionScreen(
     companion object {
         private const val WINDOW_WIDTH = 430f
         private const val WINDOW_HEIGHT = 370f
+        private const val WINDOW_HORIZONTAL_MARGIN = 32f
+        private const val WINDOW_VERTICAL_MARGIN = 24f
         private const val MAX_TARGET_SUGGESTIONS = 3
         private const val MAX_PLAYER_SUGGESTIONS = 2
     }

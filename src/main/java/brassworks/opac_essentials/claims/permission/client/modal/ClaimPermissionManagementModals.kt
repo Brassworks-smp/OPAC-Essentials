@@ -180,7 +180,7 @@ class BulkPermissionModal(
     }
 
     private fun buildUi() {
-        BrassLabel("/ claims / permissions / bulk edit", Colors.UI_TEXT_DARK).also {
+        BrassLabel("/  claims  /  permissions  /  bulk edit", Colors.UI_TEXT_DARK).also {
             it.entranceEnabled = false
         }.constrain {
             x = 43.pixels()

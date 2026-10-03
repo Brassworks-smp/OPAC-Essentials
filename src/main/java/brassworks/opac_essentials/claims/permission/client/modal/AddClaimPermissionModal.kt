@@ -16,8 +16,10 @@ import net.minecraft.client.Minecraft
 import net.minecraft.resources.ResourceLocation
 import net.swzo.brass.ui.Colors
 import net.swzo.brass.ui.kit.base.BrassAccent
+import net.swzo.brass.ui.kit.base.BrassChrome
 import net.swzo.brass.ui.kit.input.BrassButton
 import net.swzo.brass.ui.kit.input.BrassCheckbox
+import net.swzo.brass.ui.kit.input.BrassTabSwitch
 import net.swzo.brass.ui.kit.surface.BrassModal
 import net.swzo.brass.ui.kit.text.BrassLabel
 import net.swzo.brass.ui.kit.text.BrassTextInput
@@ -79,7 +81,7 @@ class AddClaimPermissionModal(
     }
 
     private fun buildUi() {
-        BrassLabel("/ claims / permissions / add", Colors.UI_TEXT_DARK).also {
+        BrassLabel("/  claims  /  permissions  /  add", Colors.UI_TEXT_DARK).also {
             it.entranceEnabled = false
         }.constrain {
             x = 43.pixels()
@@ -247,23 +249,21 @@ class AddClaimPermissionModal(
     private fun rebuildCategories() {
         categoryOptions.clearChildren()
         val options = ClaimPermissionTarget.availableTargets()
-        val optionWidth = 100f / options.size
-        options.forEachIndexed { index, option ->
-            val selected = option == target
-            BrassButton(
-                label = ClaimPermissionsScreen.displayTargetName(option.name),
-                accent = if (selected) BrassAccent.BRASS else BrassAccent.DEFAULT,
-            ) {
-                selectTarget(option)
-            }.also {
-                it.selectable = true
-                it.selected = selected
-            }.constrain {
-                x = (index * optionWidth).percent()
-                width = optionWidth.percent() - 3.pixels()
-                height = 20.pixels()
-            } childOf categoryOptions
-        }
+        BrassTabSwitch(
+            options = options.map { ClaimPermissionsScreen.displayTargetName(it.name) },
+            initialIndex = options.indexOf(target).coerceAtLeast(0),
+            equalWidths = true,
+        ) { index ->
+            selectTarget(options[index])
+        }.also { tabs ->
+            tabs.children.filterIsInstance<BrassButton>().forEach { button ->
+                button.chrome = BrassChrome.FLAT
+            }
+        }.constrain {
+            width = 100.percent() -
+                    (options.size - 1).coerceAtLeast(0).pixels()
+            height = 20.pixels()
+        } childOf categoryOptions
     }
 
     private fun selectTarget(option: ClaimPermissionTarget) {
@@ -285,7 +285,6 @@ class AddClaimPermissionModal(
         }
         targetInput.active = target != ClaimPermissionTarget.TRAIN
 
-        rebuildCategories()
         rebuildActions()
         refreshTargetSuggestions()
         refreshValidation()

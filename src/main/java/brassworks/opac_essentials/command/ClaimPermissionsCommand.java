@@ -319,6 +319,12 @@ public final class ClaimPermissionsCommand {
                 playerId
         );
         ClaimPermissionsSavedData data = ClaimPermissionsSavedData.get(claimOwner.getServer());
+        if (add && !data.contains(key) && data.isAtCapacity(claim.ownerId())) {
+            source.sendFailure(Component.literal(
+                    "The permission limit for this claim owner was reached."
+            ));
+            return 0;
+        }
         boolean changed = add ? data.add(key) : data.remove(key);
 
         if (!changed) {

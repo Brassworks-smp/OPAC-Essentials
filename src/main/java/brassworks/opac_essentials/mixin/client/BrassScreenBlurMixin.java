@@ -1,7 +1,9 @@
 package brassworks.opac_essentials.mixin.client;
 
+import brassworks.opac_essentials.claims.menu.client.OpacMainMenuScreen;
 import brassworks.opac_essentials.claims.permission.client.screen.AddClaimPermissionScreen;
 import brassworks.opac_essentials.claims.permission.client.screen.ClaimPermissionsScreen;
+import brassworks.opac_essentials.party.menu.client.PartyManagementScreen;
 import gg.essential.universal.UMatrixStack;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -29,7 +31,9 @@ public abstract class BrassScreenBlurMixin extends Screen {
             CallbackInfo callbackInfo
     ) {
         if ((Object) this instanceof ClaimPermissionsScreen
-                || (Object) this instanceof AddClaimPermissionScreen) {
+                || (Object) this instanceof AddClaimPermissionScreen
+                || (Object) this instanceof OpacMainMenuScreen
+                || (Object) this instanceof PartyManagementScreen) {
             this.renderBlurredBackground(partialTicks);
         }
     }

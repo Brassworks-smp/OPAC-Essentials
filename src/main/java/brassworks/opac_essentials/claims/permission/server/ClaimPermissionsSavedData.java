@@ -13,18 +13,25 @@ import net.minecraft.world.level.saveddata.SavedData;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 public final class ClaimPermissionsSavedData extends SavedData {
+    public static final int MAX_PERMISSIONS_PER_OWNER = 4096;
+
     private static final String DATA_NAME = "opac_better_commands_claim_permissions";
     private static final String PERMISSIONS_TAG = "permissions";
+    private static final String TRUSTED_PLAYERS_TAG = "trustedPlayers";
     private static final String LEGACY_GROUPS_TAG = "groups";
     private static final int GLOBAL_SUB_CONFIG_INDEX = -1;
 
     private final Set<ClaimPermissionKey> permissions = new HashSet<>();
+    private final Set<ClaimTrustKey> trustedPlayers = new HashSet<>();
+    private final Map<UUID, Integer> permissionCounts = new HashMap<>();
 
     public static ClaimPermissionsSavedData get(MinecraftServer server) {
         return server.overworld().getDataStorage().computeIfAbsent(
@@ -54,10 +61,23 @@ public final class ClaimPermissionsSavedData extends SavedData {
                 UUID player = entry.hasUUID("player") ? entry.getUUID("player") : null;
 
                 if (validRule(target, targetId, action)) {
-                    data.permissions.add(normalizePermission(new ClaimPermissionKey(
+                    data.addLoaded(normalizePermission(new ClaimPermissionKey(
                             owner, subConfigIndex, target, targetId, action, player
                     )));
                 }
+            } catch (RuntimeException ignored) {
+            }
+        }
+
+        ListTag trustedPlayerList = tag.getList(TRUSTED_PLAYERS_TAG, Tag.TAG_COMPOUND);
+        for (int i = 0; i < trustedPlayerList.size(); i++) {
+            CompoundTag entry = trustedPlayerList.getCompound(i);
+            try {
+                data.trustedPlayers.add(new ClaimTrustKey(
+                        entry.getUUID("owner"),
+                        entry.getInt("subConfigIndex"),
+                        entry.getUUID("player")
+                ));
             } catch (RuntimeException ignored) {
             }
         }
@@ -84,8 +104,13 @@ public final class ClaimPermissionsSavedData extends SavedData {
         ))) {
             return false;
         }
+        if (permissions.contains(permission)
+                || isAtCapacity(permission.claimOwner())) {
+            return false;
+        }
         boolean changed = permissions.add(permission);
         if (changed) {
+            permissionCounts.merge(permission.claimOwner(), 1, Integer::sum);
             setDirty();
         }
         return changed;
@@ -95,9 +120,30 @@ public final class ClaimPermissionsSavedData extends SavedData {
         permission = normalizePermission(permission);
         boolean changed = permissions.remove(permission);
         if (changed) {
+            permissionCounts.computeIfPresent(
+                    permission.claimOwner(),
+                    (owner, count) -> count > 1 ? count - 1 : null
+            );
             setDirty();
         }
         return changed;
+    }
+
+    public boolean contains(ClaimPermissionKey permission) {
+        return permissions.contains(normalizePermission(permission));
+    }
+
+    public boolean isAtCapacity(UUID owner) {
+        return permissionCounts.getOrDefault(owner, 0)
+                >= MAX_PERMISSIONS_PER_OWNER;
+    }
+
+    public int remainingCapacity(UUID owner) {
+        return Math.max(
+                0,
+                MAX_PERMISSIONS_PER_OWNER
+                        - permissionCounts.getOrDefault(owner, 0)
+        );
     }
 
     public boolean allows(UUID owner, int subConfigIndex, ClaimPermissionTarget target,
@@ -108,6 +154,41 @@ public final class ClaimPermissionsSavedData extends SavedData {
         )) || permissions.contains(new ClaimPermissionKey(
                 owner, subConfigIndex, target, targetId, action, player
         ));
+    }
+
+    public boolean trust(UUID owner, int subConfigIndex, UUID player) {
+        boolean changed = trustedPlayers.add(new ClaimTrustKey(
+                owner, subConfigIndex, player
+        ));
+        if (changed) {
+            setDirty();
+        }
+        return changed;
+    }
+
+    public boolean untrust(UUID owner, int subConfigIndex, UUID player) {
+        boolean changed = trustedPlayers.remove(new ClaimTrustKey(
+                owner, subConfigIndex, player
+        ));
+        if (changed) {
+            setDirty();
+        }
+        return changed;
+    }
+
+    public boolean isTrusted(UUID owner, int subConfigIndex, UUID player) {
+        return trustedPlayers.contains(new ClaimTrustKey(
+                owner, subConfigIndex, player
+        ));
+    }
+
+    public List<UUID> listTrusted(UUID owner, int subConfigIndex) {
+        return trustedPlayers.stream()
+                .filter(entry -> entry.claimOwner().equals(owner)
+                        && entry.subConfigIndex() == subConfigIndex)
+                .map(ClaimTrustKey::player)
+                .sorted()
+                .toList();
     }
 
     public List<ClaimPermissionKey> list(UUID owner, int subConfigIndex) {
@@ -144,6 +225,15 @@ public final class ClaimPermissionsSavedData extends SavedData {
             permissionList.add(entry);
         }
         tag.put(PERMISSIONS_TAG, permissionList);
+        ListTag trustedPlayerList = new ListTag();
+        for (ClaimTrustKey trustedPlayer : trustedPlayers) {
+            CompoundTag entry = new CompoundTag();
+            entry.putUUID("owner", trustedPlayer.claimOwner());
+            entry.putInt("subConfigIndex", trustedPlayer.subConfigIndex());
+            entry.putUUID("player", trustedPlayer.player());
+            trustedPlayerList.add(entry);
+        }
+        tag.put(TRUSTED_PLAYERS_TAG, trustedPlayerList);
         tag.remove(LEGACY_GROUPS_TAG);
         return tag;
     }
@@ -160,7 +250,7 @@ public final class ClaimPermissionsSavedData extends SavedData {
                 List<LegacyRule> rules = readLegacyRules(entry);
                 for (UUID member : members) {
                     for (LegacyRule rule : rules) {
-                        migrated |= data.permissions.add(normalizePermission(new ClaimPermissionKey(
+                        migrated |= data.addLoaded(normalizePermission(new ClaimPermissionKey(
                                 owner,
                                 subConfigIndex,
                                 rule.target(),
@@ -219,6 +309,14 @@ public final class ClaimPermissionsSavedData extends SavedData {
                 : action;
     }
 
+    private boolean addLoaded(ClaimPermissionKey permission) {
+        if (permissions.add(permission)) {
+            permissionCounts.merge(permission.claimOwner(), 1, Integer::sum);
+            return true;
+        }
+        return false;
+    }
+
     private static boolean validRule(ClaimPermissionTarget target,
                                      ResourceLocation targetId,
                                      ClaimPermissionAction action) {
@@ -248,7 +346,8 @@ public final class ClaimPermissionsSavedData extends SavedData {
                                                 ClaimPermissionTarget target,
                                                 ClaimPermissionAction action) {
         return target == ClaimPermissionTarget.TRAIN
-                && action == ClaimPermissionAction.CONTROL
+                && (action == ClaimPermissionAction.INTERACT
+                    || action == ClaimPermissionAction.CONTROL)
                 ? GLOBAL_SUB_CONFIG_INDEX
                 : subConfigIndex;
     }
@@ -256,10 +355,14 @@ public final class ClaimPermissionsSavedData extends SavedData {
     private static boolean isGlobalPermission(ClaimPermissionKey permission) {
         return permission.subConfigIndex() == GLOBAL_SUB_CONFIG_INDEX
                 && permission.target() == ClaimPermissionTarget.TRAIN
-                && permission.action() == ClaimPermissionAction.CONTROL;
+                && (permission.action() == ClaimPermissionAction.INTERACT
+                    || permission.action() == ClaimPermissionAction.CONTROL);
     }
 
     private record LegacyRule(ClaimPermissionTarget target, ResourceLocation targetId,
                               ClaimPermissionAction action) {
+    }
+
+    private record ClaimTrustKey(UUID claimOwner, int subConfigIndex, UUID player) {
     }
 }

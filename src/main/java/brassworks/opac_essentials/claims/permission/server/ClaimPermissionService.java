@@ -99,17 +99,8 @@ public final class ClaimPermissionService {
         if (target instanceof Projectile projectile) {
             return allowsThrowableProjectile(level, target.blockPosition(), player, projectile);
         }
-        if (action == ClaimPermissionAction.INTERACT
-                && isTrainEntity(target)
-                && allows(
-                level,
-                target.blockPosition(),
-                player,
-                ClaimPermissionTarget.TRAIN,
-                ClaimPermissionTarget.TRAIN_TARGET_ID,
-                action
-        )) {
-            return true;
+        if (action == ClaimPermissionAction.INTERACT && isTrainEntity(target)) {
+            return Boolean.TRUE.equals(trainInteractionPermission(target, player));
         }
         ResourceLocation targetId = BuiltInRegistries.ENTITY_TYPE.getKey(target.getType());
         return allows(level, target.blockPosition(), player,
@@ -132,23 +123,16 @@ public final class ClaimPermissionService {
                 ClaimPermissionTarget.ENTITY, targetId, ClaimPermissionAction.ATTACK);
     }
 
-    public static boolean allowsTrainInteraction(int entityId, ServerPlayer player) {
+    @Nullable
+    public static Boolean trainInteractionPermission(int entityId, ServerPlayer player) {
         if (!ModList.get().isLoaded("create")) {
-            return false;
+            return null;
         }
-        ServerLevel level = player.serverLevel();
-        Entity train = level.getEntity(entityId);
+        Entity train = player.serverLevel().getEntity(entityId);
         if (!isTrainEntity(train)) {
-            return false;
+            return null;
         }
-        return allows(
-                level,
-                train.blockPosition(),
-                player,
-                ClaimPermissionTarget.TRAIN,
-                ClaimPermissionTarget.TRAIN_TARGET_ID,
-                ClaimPermissionAction.INTERACT
-        );
+        return trainInteractionPermission(train, player);
     }
 
     public static boolean isTrainController(int entityId, @Nullable BlockPos localPos,
@@ -190,6 +174,17 @@ public final class ClaimPermissionService {
 
     @Nullable
     private static Boolean trainControlPermission(Entity train, ServerPlayer player) {
+        return trainOwnerPermission(train, player, ClaimPermissionAction.CONTROL);
+    }
+
+    @Nullable
+    private static Boolean trainInteractionPermission(Entity train, ServerPlayer player) {
+        return trainOwnerPermission(train, player, ClaimPermissionAction.INTERACT);
+    }
+
+    @Nullable
+    private static Boolean trainOwnerPermission(Entity train, ServerPlayer player,
+                                                ClaimPermissionAction action) {
         UUID trainOwner = trainOwner(train);
         if (trainOwner != null) {
             if (player.getUUID().equals(trainOwner)) {
@@ -200,7 +195,7 @@ public final class ClaimPermissionService {
                     GLOBAL_SUB_CONFIG_INDEX,
                     ClaimPermissionTarget.TRAIN,
                     ClaimPermissionTarget.TRAIN_TARGET_ID,
-                    ClaimPermissionAction.CONTROL,
+                    action,
                     player.getUUID()
             )) {
                 return true;
@@ -224,8 +219,14 @@ public final class ClaimPermissionService {
         if (trainOwner == null) {
             return false;
         }
+        ClaimPermissionsSavedData data = ClaimPermissionsSavedData.get(player.getServer());
         return claim.ownerId().equals(trainOwner)
-                || ClaimPermissionsSavedData.get(player.getServer()).allows(
+                || data.isTrusted(
+                        claim.ownerId(),
+                        claim.subConfigIndex(),
+                        trainOwner
+                )
+                || data.allows(
                         claim.ownerId(),
                         claim.subConfigIndex(),
                         ClaimPermissionTarget.TRAIN,
@@ -294,7 +295,12 @@ public final class ClaimPermissionService {
         if (claim == null) {
             return false;
         }
-        return ClaimPermissionsSavedData.get(player.getServer()).allows(
+        ClaimPermissionsSavedData data = ClaimPermissionsSavedData.get(player.getServer());
+        return data.isTrusted(
+                claim.ownerId(),
+                claim.subConfigIndex(),
+                player.getUUID()
+        ) || data.allows(
                 claim.ownerId(),
                 claim.subConfigIndex(),
                 target,

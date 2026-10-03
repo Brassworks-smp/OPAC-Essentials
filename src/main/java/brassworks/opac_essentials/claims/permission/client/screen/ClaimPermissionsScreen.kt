@@ -1,5 +1,6 @@
 package brassworks.opac_essentials.claims.permission.client.screen
 
+import brassworks.opac_essentials.client.ResponsiveBrassScreen
 import brassworks.opac_essentials.claims.permission.client.OpacEssentialsUiTheme
 import brassworks.opac_essentials.claims.permission.client.modal.AddClaimPermissionModal
 import brassworks.opac_essentials.claims.permission.client.modal.BulkPermissionModal
@@ -24,7 +25,7 @@ import gg.essential.elementa.dsl.minus
 import gg.essential.elementa.dsl.percent
 import gg.essential.elementa.dsl.pixels
 import gg.essential.universal.UKeyboard
-import net.swzo.brass.ui.BrassScreen
+import net.swzo.brass.ui.BrassThemes
 import net.swzo.brass.ui.Colors
 import net.swzo.brass.ui.kit.base.BrassAccent
 import net.swzo.brass.ui.kit.base.BrassChrome
@@ -33,6 +34,7 @@ import net.swzo.brass.ui.kit.input.BrassButton
 import net.swzo.brass.ui.kit.input.BrassCheckbox
 import net.swzo.brass.ui.kit.input.BrassSearchField
 import net.swzo.brass.ui.kit.input.BrassSquareButton
+import net.swzo.brass.ui.kit.input.BrassTabSwitch
 import net.swzo.brass.ui.kit.layout.BrassFlow
 import net.swzo.brass.ui.kit.media.BrassBlockPreview
 import net.swzo.brass.ui.kit.media.BrassEntity
@@ -49,18 +51,31 @@ import java.util.Locale
 
 class ClaimPermissionsScreen(
     initialPayload: ClaimPermissionsSyncPayload,
-) : BrassScreen(backdropColor = OpacEssentialsUiTheme.BACKDROP) {
+) : ResponsiveBrassScreen(
+    WINDOW_WIDTH,
+    WINDOW_HEIGHT,
+    WINDOW_HORIZONTAL_MARGIN,
+    WINDOW_VERTICAL_MARGIN,
+    OpacEssentialsUiTheme.BACKDROP,
+) {
     private var payload = initialPayload
     private var serverEntries = entriesFromPayload(initialPayload)
     private var draftEntries = LinkedHashMap(serverEntries)
     private var query = ""
+    private var selectedCategory: ClaimPermissionTarget? = null
     private var selectedKey: TargetKey? = null
     private var visibleTargets: List<TargetGroup> = emptyList()
     private var savingChanges = false
     private var closeAfterSave = false
+    private lateinit var previousThemeId: String
+    private var previousAccentHex: String? = null
+    private var themeApplied = false
 
     private val permissionCheckboxes = mutableMapOf<PermissionSlot, BrassCheckbox>()
     private val targetTiles = mutableMapOf<TargetKey, BrassButton>()
+    private var categoryOptions: List<ClaimPermissionTarget?> = emptyList()
+    private lateinit var categoryContent: UIContainer
+    private lateinit var categorySwitch: BrassTabSwitch
     private lateinit var targetContent: UIContainer
     private lateinit var detailHost: UIContainer
     private lateinit var detailContent: UIContainer
@@ -70,12 +85,26 @@ class ClaimPermissionsScreen(
     private lateinit var bulkButton: BrassButton
     private lateinit var frame: BrassWindow
 
-    init {
+    override fun afterInitialization() {
+        super.afterInitialization()
+        if (!themeApplied) {
+            previousThemeId = BrassThemes.currentId
+            previousAccentHex = BrassThemes.accentHex
+            themeApplied = true
+        }
         OpacEssentialsUiTheme.apply()
         buildUi()
+        rebuildCategories()
         refreshTargets(selectFirst = true)
         refreshStatus()
         OpacEssentialsUiTheme.disableAnimations(background)
+    }
+
+    override fun onScreenClose() {
+        super.onScreenClose()
+        if (themeApplied) {
+            BrassThemes.apply(previousThemeId, previousAccentHex)
+        }
     }
 
     private fun buildUi() {
@@ -89,12 +118,8 @@ class ClaimPermissionsScreen(
         ).constrain {
             x = CenterConstraint()
             y = CenterConstraint()
-            width = basicWidthConstraint { component ->
-                minOf(WINDOW_WIDTH, (component.parent.getWidth() - 28f).coerceAtLeast(MIN_WINDOW_WIDTH))
-            }
-            height = basicHeightConstraint { component ->
-                minOf(WINDOW_HEIGHT, (component.parent.getHeight() - 24f).coerceAtLeast(MIN_WINDOW_HEIGHT))
-            }
+            width = responsiveWindowWidthConstraint()
+            height = responsiveWindowHeightConstraint()
         } childOf background
 
         BrassSquareButton(BrassIcons.NONE, BrassAccent.DANGER) { requestClose() }.also {
@@ -154,12 +179,24 @@ class ClaimPermissionsScreen(
             height = 18.pixels()
         } childOf content
 
+        val categoryHost = UIContainer().constrain {
+            x = 12.pixels()
+            y = 38.pixels()
+            width = 100.percent() - 24.pixels()
+            height = 20.pixels()
+        } childOf content
+
+        categoryContent = UIContainer().constrain {
+            width = 100.percent()
+            height = 100.percent()
+        } childOf categoryHost
+
         val targetPanel = BrassPanel(
             title = "PERMISSION TARGETS",
             layout = BrassPanel.Layout.FREE,
         ).constrain {
             x = 12.pixels()
-            y = 38.pixels()
+            y = 66.pixels()
             width = 100.percent() - 24.pixels()
             height = 90.pixels()
         } childOf content
@@ -185,9 +222,9 @@ class ClaimPermissionsScreen(
             layout = BrassPanel.Layout.FREE,
         ).constrain {
             x = 12.pixels()
-            y = 136.pixels()
+            y = 164.pixels()
             width = 100.percent() - 24.pixels()
-            height = 100.percent() - 172.pixels()
+            height = 100.percent() - 200.pixels()
         } childOf content
         detailHost = detailPanel.content
         detailContent = UIContainer().constrain {
@@ -255,6 +292,42 @@ class ClaimPermissionsScreen(
         rebuildDetails()
     }
 
+    private fun rebuildCategories() {
+        categoryContent.clearChildren()
+        categoryOptions = buildList<ClaimPermissionTarget?> {
+            add(null)
+            addAll(ClaimPermissionTarget.availableTargets())
+        }
+        val labels = categoryOptions.map { option ->
+            option?.let { displayTargetName(it.name) } ?: "All"
+        }
+        categorySwitch = BrassTabSwitch(
+            options = labels,
+            initialIndex = categoryOptions.indexOf(selectedCategory).coerceAtLeast(0),
+            equalWidths = true,
+        ) { index ->
+            val option = categoryOptions[index]
+            if (selectedCategory != option) {
+                selectedCategory = option
+                refreshTargets(selectFirst = true)
+            }
+        }.also { tabs ->
+            tabs.children.filterIsInstance<BrassButton>().forEach { button ->
+                button.chrome = BrassChrome.FLAT
+                button.entranceEnabled = false
+            }
+        }.constrain {
+            width = 100.percent() -
+                    (categoryOptions.size - 1).coerceAtLeast(0).pixels()
+            height = 18.pixels()
+        } childOf categoryContent
+    }
+
+    private fun syncCategorySelection() {
+        val index = categoryOptions.indexOf(selectedCategory)
+        if (index >= 0) categorySwitch.setSilently(index)
+    }
+
     private fun openAddPermission() {
         if (savingChanges) return
         AddClaimPermissionModal(
@@ -265,7 +338,12 @@ class ClaimPermissionsScreen(
     }
 
     private fun updateVisibleTargets(selectFirst: Boolean) {
-        visibleTargets = groupedTargets().filter(::matchesQuery)
+        visibleTargets = groupedTargets()
+            .filter { group ->
+                selectedCategory == null ||
+                        parseTarget(group.key.target) == selectedCategory
+            }
+            .filter(::matchesQuery)
         if (selectFirst && selectedKey == null) {
             selectedKey = visibleTargets.firstOrNull()?.key
         } else if (visibleTargets.none { it.key == selectedKey }) {
@@ -295,7 +373,11 @@ class ClaimPermissionsScreen(
             BrassEmptyState(
                 BrassIcons.SEARCH,
                 "No permission targets",
-                if (query.isEmpty()) "Add a target to get started" else "Try a shorter search term",
+                if (query.isEmpty() && selectedCategory == null) {
+                    "Add a target to get started"
+                } else {
+                    "Try another category or search term"
+                },
             ).also {
                 it.chrome = BrassChrome.FLAT
                 it.clickable = true
@@ -644,7 +726,9 @@ class ClaimPermissionsScreen(
                 putDraft(PermissionDraftEntry(target.target, target.targetId, action.name, subject))
             }
         }
+        selectedCategory = parseTarget(target.target)
         selectedKey = TargetKey(target.target, target.targetId)
+        syncCategorySelection()
         refreshTargets(selectFirst = false)
         refreshStatus()
     }
@@ -729,6 +813,12 @@ class ClaimPermissionsScreen(
             return
         }
 
+        if (changes.size > ClaimPermissionsBatchPayload.MAX_TARGETS) {
+            statusLabel.text = "Too many permission changes. Save smaller batches."
+            statusLabel.tint = Colors.DANGER
+            return
+        }
+
         savingChanges = true
         closeAfterSave = closeAfter
         setInteractive(false)
@@ -790,6 +880,7 @@ class ClaimPermissionsScreen(
         bulkButton.active = active
         doneButton.active = active
         targetTiles.values.forEach { it.active = active }
+        categorySwitch.children.filterIsInstance<BrassButton>().forEach { it.active = active }
         permissionCheckboxes.values.forEach { it.active = active }
     }
 
@@ -907,9 +998,11 @@ class ClaimPermissionsScreen(
     companion object {
         private const val WINDOW_WIDTH = 600f
         private const val WINDOW_HEIGHT = 360f
-        private const val MIN_WINDOW_WIDTH = 270f
-        private const val MIN_WINDOW_HEIGHT = 180f
-        private const val MIN_CONTENT_HEIGHT = 270f
+        private const val MIN_WINDOW_WIDTH = 200f
+        private const val MIN_WINDOW_HEIGHT = 120f
+        private const val WINDOW_HORIZONTAL_MARGIN = 28f
+        private const val WINDOW_VERTICAL_MARGIN = 24f
+        private const val MIN_CONTENT_HEIGHT = 298f
         private const val TARGET_WIDTH = 90f
         private const val TARGET_HEIGHT = 58f
         private const val TARGET_STEP = 96f

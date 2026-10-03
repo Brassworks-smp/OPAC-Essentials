@@ -1,5 +1,6 @@
 package brassworks.opac_essentials.config;
 
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 public final class EssentialsConfig {
@@ -11,6 +12,8 @@ public final class EssentialsConfig {
     public static final ModConfigSpec.ConfigValue<String> UNCLAIM_COMMAND;
     public static final ModConfigSpec.ConfigValue<String> PARTY_CHAT_COMMAND;
     public static final ModConfigSpec.BooleanValue PROTECT_TRAIN_CONTROLS;
+    public static final ModConfigSpec.ConfigValue<String> CLAIM_CURRENCY_ITEM;
+    public static final ModConfigSpec.IntValue CLAIM_PRICE_PER_CLAIM;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -38,6 +41,22 @@ public final class EssentialsConfig {
         PARTY_CHAT_COMMAND = defineCommand(
                 builder, "party_chat", "pchat",
                 "Root command for OPAC - Essentials party chat."
+        );
+
+        builder.pop();
+        builder.push("claim_purchase");
+
+        CLAIM_CURRENCY_ITEM = builder.define(
+                "currency_item",
+                "minecraft:emerald",
+                value -> value instanceof String itemId
+                        && ResourceLocation.tryParse(itemId) != null
+        );
+        CLAIM_PRICE_PER_CLAIM = builder.defineInRange(
+                "price_per_claim",
+                1,
+                1,
+                1_000_000
         );
 
         builder.pop();

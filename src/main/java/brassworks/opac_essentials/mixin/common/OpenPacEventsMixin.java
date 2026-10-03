@@ -109,7 +109,7 @@ public abstract class OpenPacEventsMixin {
             return;
         }
         event.setUseBlock(interact ? TriState.TRUE : TriState.FALSE);
-        event.setUseItem(interact || place || throwable ? TriState.TRUE : TriState.FALSE);
+        event.setUseItem(place || throwable ? TriState.TRUE : TriState.FALSE);
         callback.cancel();
     }
 
@@ -144,7 +144,11 @@ public abstract class OpenPacEventsMixin {
         if (ClaimPermissionService.allowsEntityDamage(
                 event.getSource().getEntity(),
                 event.getEntity()
-        )) {
+        ) || (event.getSource().getDirectEntity() instanceof Projectile
+                && ClaimPermissionService.allowsEntityDamage(
+                event.getSource().getDirectEntity(),
+                event.getEntity()
+        ))) {
             callback.cancel();
         }
     }
