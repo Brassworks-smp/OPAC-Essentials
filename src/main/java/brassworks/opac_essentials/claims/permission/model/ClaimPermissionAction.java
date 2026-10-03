@@ -5,7 +5,9 @@ public enum ClaimPermissionAction {
     BREAK("break"),
     PLACE("place"),
     ATTACK("attack"),
-    THROWABLE("throwable");
+    THROWABLE("throwable"),
+    TRAVEL("travel"),
+    CONTROL("control");
 
     private final String commandName;
 

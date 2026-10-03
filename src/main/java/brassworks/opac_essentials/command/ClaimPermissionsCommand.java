@@ -1,5 +1,12 @@
 package brassworks.opac_essentials.command;
 
+import brassworks.opac_essentials.claims.permission.model.ClaimPermissionAction;
+import brassworks.opac_essentials.claims.permission.model.ClaimPermissionKey;
+import brassworks.opac_essentials.claims.permission.model.ClaimPermissionTarget;
+import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsNetwork;
+import brassworks.opac_essentials.claims.permission.server.ClaimPermissionsSavedData;
+import brassworks.opac_essentials.claims.permission.server.ClaimPermissionsUiService;
+import brassworks.opac_essentials.compat.openpac.OpenPacCompat;
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -18,13 +25,6 @@ import net.minecraft.commands.arguments.ResourceLocationArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import brassworks.opac_essentials.compat.openpac.OpenPacCompat;
-import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsNetwork;
-import brassworks.opac_essentials.claims.permission.model.ClaimPermissionAction;
-import brassworks.opac_essentials.claims.permission.model.ClaimPermissionKey;
-import brassworks.opac_essentials.claims.permission.model.ClaimPermissionTarget;
-import brassworks.opac_essentials.claims.permission.server.ClaimPermissionsSavedData;
-import brassworks.opac_essentials.claims.permission.server.ClaimPermissionsUiService;
 
 import java.util.Collection;
 import java.util.List;
@@ -40,7 +40,7 @@ public final class ClaimPermissionsCommand {
                 .then(Commands.literal("list").executes(this::list));
 
         LiteralArgumentBuilder<CommandSourceStack> addOperation = Commands.literal("add");
-        for (ClaimPermissionTarget target : ClaimPermissionTarget.values()) {
+        for (ClaimPermissionTarget target : ClaimPermissionTarget.availableTargets()) {
             LiteralArgumentBuilder<CommandSourceStack> targetNode =
                     Commands.literal(target.commandName());
             RequiredArgumentBuilder<CommandSourceStack, ResourceLocation> targetIdNode =
@@ -319,6 +319,12 @@ public final class ClaimPermissionsCommand {
                 playerId
         );
         ClaimPermissionsSavedData data = ClaimPermissionsSavedData.get(claimOwner.getServer());
+        if (add && !data.contains(key) && data.isAtCapacity(claim.ownerId())) {
+            source.sendFailure(Component.literal(
+                    "The permission limit for this claim owner was reached."
+            ));
+            return 0;
+        }
         boolean changed = add ? data.add(key) : data.remove(key);
 
         if (!changed) {

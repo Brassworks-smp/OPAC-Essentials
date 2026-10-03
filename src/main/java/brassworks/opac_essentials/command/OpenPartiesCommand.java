@@ -1,6 +1,9 @@
 package brassworks.opac_essentials.command;
 
+import brassworks.opac_essentials.party.menu.server.PartyMenuService;
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.tree.CommandNode;
+import com.mojang.brigadier.tree.LiteralCommandNode;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 
@@ -12,9 +15,21 @@ public class OpenPartiesCommand {
     }
 
     public void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        var openPacParties = dispatcher.getRoot().getChild("openpac-parties");
+        CommandNode<CommandSourceStack> openPacParties =
+                OpenPacCommandResolver.findParties(dispatcher);
+        LiteralCommandNode<CommandSourceStack> parties = dispatcher.register(
+                Commands.literal(commandName).executes(context -> {
+                    PartyMenuService.sendOpenSnapshot(
+                            context.getSource().getPlayerOrException()
+                    );
+                    return 1;
+                })
+        );
         if (openPacParties != null) {
-            dispatcher.register(Commands.literal(commandName).redirect(openPacParties));
+            for (CommandNode<CommandSourceStack> child
+                    : openPacParties.getChildren()) {
+                parties.addChild(child);
+            }
         }
     }
 }

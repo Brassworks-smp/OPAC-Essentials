@@ -1,6 +1,6 @@
 plugins {
     id 'java-library'
-    id 'org.jetbrains.kotlin.jvm' version '2.0.21'
+    id 'org.jetbrains.kotlin.jvm' version '2.3.0'
     id 'maven-publish'
     id 'idea'
     id 'net.neoforged.moddev' version '2.0.116'
@@ -132,18 +132,13 @@ sourceSets.main.resources {
 }
 
 dependencies {
-    implementation(
-            'curse.maven:open-parties-and-claims-636608:8507166'
-    )
-    implementation(
-            'curse.maven:xaeros-minimap-263420:8449819'
-    )
-    implementation(
-            'curse.maven:xaeros-world-map-317780:8449921'
-    )
+    implementation "curse.maven:open-parties-and-claims-636608:8690620"
+    implementation "curse.maven:xaeros-minimap-263420:8449819"
+    implementation "curse.maven:xaeros-world-map-317780:8449921"
+    implementation "curse.maven:create-328085:7963363"
+    implementation "curse.maven:kotlin-for-forge-351264:8335665"
 
-    implementation(jarJar('net.swzo.brass:brassui:2.2.11'))
-    runtimeOnly 'thedarkcolour:kotlinforforge-neoforge:5.12.0'
+    implementation(jarJar('net.swzo.brass:brassui:2.4.1-mc1.21.1'))
 }
 
 /*

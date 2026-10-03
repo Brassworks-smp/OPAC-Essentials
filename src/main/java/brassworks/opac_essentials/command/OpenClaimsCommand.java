@@ -15,10 +15,12 @@ public class OpenClaimsCommand {
 
     public void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         CommandNode<CommandSourceStack> openPacClaims =
-                dispatcher.getRoot().getChild("openpac-claims");
+                OpenPacCommandResolver.findClaims(dispatcher);
         LiteralCommandNode<CommandSourceStack> claims = dispatcher.register(
                 Commands.literal(commandName)
                         .then(new ClaimPermissionsCommand().create())
+                        .then(new ClaimTrustCommand().create(true))
+                        .then(new ClaimTrustCommand().create(false))
         );
 
         if (openPacClaims != null) {

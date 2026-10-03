@@ -3,11 +3,11 @@ package brassworks.opac_essentials.claims.permission.server;
 import brassworks.opac_essentials.claims.permission.model.ClaimPermissionAction;
 import brassworks.opac_essentials.claims.permission.model.ClaimPermissionKey;
 import brassworks.opac_essentials.claims.permission.model.ClaimPermissionTarget;
-import brassworks.opac_essentials.compat.openpac.OpenPacCompat;
 import brassworks.opac_essentials.claims.permission.network.ClaimPermissionMutationPayload;
 import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsBatchPayload;
 import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsNetwork;
 import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsSyncPayload;
+import brassworks.opac_essentials.compat.openpac.OpenPacCompat;
 import com.mojang.authlib.GameProfile;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -19,14 +19,20 @@ import net.minecraft.world.level.storage.LevelResource;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
 public final class ClaimPermissionsUiService {
     private static final UUID INVALID_PLAYER = new UUID(0L, 0L);
+    private static final int MAX_BATCH_COMBINATIONS = 4096;
+    private static final long MUTATION_INTERVAL_NANOS = 100_000_000L;
+    private static final Map<UUID, Long> NEXT_MUTATION = new HashMap<>();
 
     private ClaimPermissionsUiService() {
     }
@@ -50,8 +56,17 @@ public final class ClaimPermissionsUiService {
         return 1;
     }
 
+    public static void openSelected(ServerPlayer player) {
+        open(player.createCommandSourceStack());
+    }
+
     public static void mutate(ServerPlayer player,
                               ClaimPermissionMutationPayload payload) {
+        if (!allowMutation(player)) {
+            rejectMutation(player, payload.claimOwner(), payload.subConfigIndex(),
+                    "Please wait before changing permissions again.");
+            return;
+        }
         OpenPacCompat.Claim claim = currentPayloadClaim(
                 player, payload.claimOwner(), payload.subConfigIndex()
         );
@@ -102,6 +117,22 @@ public final class ClaimPermissionsUiService {
 
         switch (payload.operation()) {
             case ADD -> {
+                long additions = actions.stream()
+                        .map(selectedAction -> key(
+                                claim,
+                                target,
+                                targetId,
+                                selectedAction,
+                                selectedPlayer
+                        ))
+                        .filter(permission -> !data.contains(permission))
+                        .count();
+                if (additions > data.remainingCapacity(claim.ownerId())) {
+                    sync(player, claim,
+                            "The permission limit for this claim owner would be exceeded.",
+                            true);
+                    return;
+                }
                 int added = 0;
                 for (ClaimPermissionAction selectedAction : actions) {
                     if (data.add(key(
@@ -117,9 +148,8 @@ public final class ClaimPermissionsUiService {
                 int existing = actions.size() - added;
                 if (added == 0) {
                     status = actions.size() == 1
-                            ? "That permission already exists."
-                            : "Those permissions already exist.";
-                    error = true;
+                            ? "Nothing changed. That permission already exists."
+                            : "Nothing changed. Those permissions already exist.";
                 } else if (actions.size() == 1) {
                     status = "Permission added.";
                 } else if (existing == 0) {
@@ -174,6 +204,11 @@ public final class ClaimPermissionsUiService {
 
     public static void mutateBatch(ServerPlayer player,
                                    ClaimPermissionsBatchPayload payload) {
+        if (!allowMutation(player)) {
+            rejectMutation(player, payload.claimOwner(), payload.subConfigIndex(),
+                    "Please wait before changing permissions again.");
+            return;
+        }
         OpenPacCompat.Claim claim = currentPayloadClaim(
                 player, payload.claimOwner(), payload.subConfigIndex()
         );
@@ -201,38 +236,60 @@ public final class ClaimPermissionsUiService {
             return;
         }
 
-        ClaimPermissionsSavedData data = ClaimPermissionsSavedData.get(player.getServer());
-        int changed = 0;
-        int combinations = 0;
-
+        Set<ParsedTarget> targets = new LinkedHashSet<>();
         for (ClaimPermissionsBatchPayload.TargetEntry targetEntry : payload.targets()) {
             ParsedTarget parsed = parseTarget(targetEntry);
-            if (parsed == null) {
-                continue;
+            if (parsed != null) {
+                targets.add(parsed);
             }
+        }
+
+        Set<ClaimPermissionKey> permissions = new LinkedHashSet<>();
+        for (ParsedTarget parsed : targets) {
             for (ClaimPermissionAction action : actions) {
                 if (!parsed.target().supports(action)) {
                     continue;
                 }
                 for (UUID selectedPlayer : playerSelection.players()) {
-                    combinations++;
-                    ClaimPermissionKey permission = key(
+                    permissions.add(key(
                             claim,
                             parsed.target(),
                             parsed.targetId(),
                             action,
                             selectedPlayer
-                    );
-                    if (payload.enabled() ? data.add(permission) : data.remove(permission)) {
-                        changed++;
+                    ));
+                    if (permissions.size() > MAX_BATCH_COMBINATIONS) {
+                        sync(player, claim,
+                                "Too many permission combinations were selected.",
+                                true);
+                        return;
                     }
                 }
             }
         }
 
-        if (combinations == 0) {
+        if (permissions.isEmpty()) {
             sync(player, claim, "No valid target and action combinations selected.", true);
             return;
+        }
+        ClaimPermissionsSavedData data = ClaimPermissionsSavedData.get(player.getServer());
+        if (payload.enabled()) {
+            long additions = permissions.stream()
+                    .filter(permission -> !data.contains(permission))
+                    .count();
+            if (additions > data.remainingCapacity(claim.ownerId())) {
+                sync(player, claim,
+                        "The permission limit for this claim owner would be exceeded.",
+                        true);
+                return;
+            }
+        }
+
+        int changed = 0;
+        for (ClaimPermissionKey permission : permissions) {
+            if (payload.enabled() ? data.add(permission) : data.remove(permission)) {
+                changed++;
+            }
         }
         String operation = payload.enabled() ? "enabled" : "removed";
         String status = changed == 0
@@ -247,7 +304,7 @@ public final class ClaimPermissionsUiService {
         Set<ClaimPermissionKey> existing = new LinkedHashSet<>(
                 data.list(claim.ownerId(), claim.subConfigIndex())
         );
-        List<PendingMutation> mutations = new ArrayList<>();
+        Map<ClaimPermissionKey, Boolean> mutations = new LinkedHashMap<>();
         for (ClaimPermissionsBatchPayload.TargetEntry targetEntry : payload.targets()) {
             ParsedTarget parsed = parseTarget(targetEntry);
             if (parsed == null) {
@@ -286,14 +343,34 @@ public final class ClaimPermissionsUiService {
                         "Player not found: " + targetEntry.playerName() + ".", true);
                 return;
             }
-            mutations.add(new PendingMutation(permission, targetEntry.enabled()));
+            mutations.put(permission, targetEntry.enabled());
+        }
+
+        long removals = mutations.entrySet().stream()
+                .filter(entry -> !entry.getValue())
+                .map(Map.Entry::getKey)
+                .filter(data::contains)
+                .count();
+        long additions = mutations.entrySet().stream()
+                .filter(entry -> entry.getValue())
+                .map(Map.Entry::getKey)
+                .filter(permission -> !data.contains(permission))
+                .count();
+        if (additions > data.remainingCapacity(claim.ownerId()) + removals) {
+            sync(player, claim,
+                    "The permission limit for this claim owner would be exceeded.",
+                    true);
+            return;
         }
 
         int changed = 0;
-        for (PendingMutation mutation : mutations) {
-            if (mutation.enabled()
-                    ? data.add(mutation.permission())
-                    : data.remove(mutation.permission())) {
+        for (Map.Entry<ClaimPermissionKey, Boolean> mutation : mutations.entrySet()) {
+            if (!mutation.getValue() && data.remove(mutation.getKey())) {
+                changed++;
+            }
+        }
+        for (Map.Entry<ClaimPermissionKey, Boolean> mutation : mutations.entrySet()) {
+            if (mutation.getValue() && data.add(mutation.getKey())) {
                 changed++;
             }
         }
@@ -446,9 +523,19 @@ public final class ClaimPermissionsUiService {
     private static void sync(ServerPlayer player, OpenPacCompat.Claim claim,
                              String status, boolean error) {
         ClaimPermissionsSavedData data = ClaimPermissionsSavedData.get(player.getServer());
-        List<ClaimPermissionsSyncPayload.Entry> entries = data
-                .list(claim.ownerId(), claim.subConfigIndex())
+        List<ClaimPermissionKey> permissions = data.list(
+                claim.ownerId(), claim.subConfigIndex()
+        );
+        if (permissions.size() > ClaimPermissionsSavedData.MAX_PERMISSIONS_PER_OWNER) {
+            status = "This claim owner has too many saved permissions."
+                    + " Only the first "
+                    + ClaimPermissionsSavedData.MAX_PERMISSIONS_PER_OWNER
+                    + " can be displayed.";
+            error = true;
+        }
+        List<ClaimPermissionsSyncPayload.Entry> entries = permissions
                 .stream()
+                .limit(ClaimPermissionsSavedData.MAX_PERMISSIONS_PER_OWNER)
                 .map(permission -> new ClaimPermissionsSyncPayload.Entry(
                         permission.target().name(),
                         permission.targetId().toString(),
@@ -474,6 +561,24 @@ public final class ClaimPermissionsUiService {
         );
     }
 
+    private static void rejectMutation(ServerPlayer player, UUID owner,
+                                       int subConfigIndex, String status) {
+        player.sendSystemMessage(Component.literal(status).withStyle(ChatFormatting.RED));
+        ClaimPermissionsNetwork.sendTo(
+                player,
+                new ClaimPermissionsSyncPayload(
+                        owner,
+                        subConfigIndex,
+                        playerName(player, owner),
+                        scopeName(new OpenPacCompat.Claim(owner, subConfigIndex)),
+                        !owner.equals(player.getUUID()),
+                        status,
+                        true,
+                        List.of()
+                )
+        );
+    }
+
     private static String playerName(ServerPlayer player, UUID playerId) {
         if (playerId == null) {
             return "All players";
@@ -487,15 +592,16 @@ public final class ClaimPermissionsUiService {
     private static OpenPacCompat.Claim currentPayloadClaim(ServerPlayer player,
                                                             UUID owner,
                                                             int subConfigIndex) {
-        OpenPacCompat.Claim claim = getEditableClaim(player, true);
+        OpenPacCompat.Claim claim = getEditableClaim(player, false);
         if (claim == null) {
+            rejectMutation(player, owner, subConfigIndex,
+                    "Stand inside a claim you can manage before changing permissions.");
             return null;
         }
         if (!claim.ownerId().equals(owner)
                 || claim.subConfigIndex() != subConfigIndex) {
-            sync(player, claim,
-                    "You are no longer inside the claim this screen was opened for.",
-                    true);
+            rejectMutation(player, owner, subConfigIndex,
+                    "The selected claim no longer matches your position.");
             return null;
         }
         return claim;
@@ -531,6 +637,19 @@ public final class ClaimPermissionsUiService {
         return player.createCommandSourceStack().hasPermission(2);
     }
 
+    private static boolean allowMutation(ServerPlayer player) {
+        long now = System.nanoTime();
+        long next = NEXT_MUTATION.getOrDefault(player.getUUID(), 0L);
+        if (now < next) {
+            return false;
+        }
+        NEXT_MUTATION.put(player.getUUID(), now + MUTATION_INTERVAL_NANOS);
+        if (NEXT_MUTATION.size() > 1024) {
+            NEXT_MUTATION.entrySet().removeIf(entry -> entry.getValue() < now);
+        }
+        return true;
+    }
+
     private static String scopeName(OpenPacCompat.Claim claim) {
         return claim.subConfigIndex() < 0
                 ? "Main claim"
@@ -544,6 +663,4 @@ public final class ClaimPermissionsUiService {
     private record PlayerSelection(List<UUID> players, String error) {
     }
 
-    private record PendingMutation(ClaimPermissionKey permission, boolean enabled) {
-    }
 }

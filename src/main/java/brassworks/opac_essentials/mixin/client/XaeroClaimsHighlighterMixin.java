@@ -24,7 +24,11 @@ public abstract class XaeroClaimsHighlighterMixin {
             int regionX,
             int regionZ,
             CallbackInfoReturnable<Integer> callback) {
-        int revision = ClaimSearchClient.getSelectedClusterHighlightRevision();
+        int revision = ClaimSearchClient.getSelectedClusterHighlightRevision(
+                dimension.location(),
+                regionX,
+                regionZ
+        );
         callback.setReturnValue(callback.getReturnValue() ^ revision * 0x9E3779B9);
     }
 }

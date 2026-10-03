@@ -67,6 +67,7 @@ public final class ClaimSearchClient {
             .thenComparingInt(ClaimCluster::maxZ);
 
     private static Screen activeMapScreen;
+    private static SearchToggleButton searchToggleButton;
     private static EditBox searchBox;
     private static ClusterNavButton previousButton;
     private static ClusterNavButton nextButton;
@@ -108,16 +109,12 @@ public final class ClaimSearchClient {
         nextButton = null;
 
         int buttonTop = findSearchButtonTop(event, screen);
-        SearchToggleButton searchButton = new SearchToggleButton(
+        searchToggleButton = new SearchToggleButton(
                 screen.width - BUTTON_SIZE,
                 buttonTop,
                 searchOpen,
                 button -> toggleSearch(screen)
         );
-        searchButton.setTooltip(Tooltip.create(Component.literal(
-                searchOpen ? "Close claim search" : "Open claim search"
-        )));
-        event.addListener(searchButton);
 
         if (!searchOpen) {
             return;
@@ -183,6 +180,46 @@ public final class ClaimSearchClient {
     }
 
     @SubscribeEvent
+    public static void onMouseButtonPressed(ScreenEvent.MouseButtonPressed.Pre event) {
+        SearchToggleButton button = searchToggleButton;
+        if (event.getScreen() != activeMapScreen
+                || button == null
+                || event.getButton() != 0
+                || !button.isMouseOver(event.getMouseX(), event.getMouseY())) {
+            return;
+        }
+        button.onPress();
+        event.setCanceled(true);
+    }
+
+    @SubscribeEvent
+    public static void onScreenRender(ScreenEvent.Render.Post event) {
+        Screen screen = event.getScreen();
+        SearchToggleButton button = searchToggleButton;
+        if (screen != activeMapScreen || button == null || !isXaeroMapScreen(screen)) {
+            return;
+        }
+        button.visible = true;
+        button.active = true;
+        event.getGuiGraphics().pose().pushPose();
+        event.getGuiGraphics().pose().translate(0.0F, 0.0F, 1000.0F);
+        button.render(
+                event.getGuiGraphics(),
+                event.getMouseX(),
+                event.getMouseY(),
+                event.getPartialTick()
+        );
+        button.renderXaeroTooltip(
+                event.getGuiGraphics(),
+                event.getMouseX(),
+                event.getMouseY(),
+                screen.width,
+                screen.height
+        );
+        event.getGuiGraphics().pose().popPose();
+    }
+
+    @SubscribeEvent
     public static void onScreenClosing(ScreenEvent.Closing event) {
         if (event.getScreen() == activeMapScreen) {
             clearSearch();
@@ -220,7 +257,6 @@ public final class ClaimSearchClient {
         }
     }
 
-    // Kept for compatibility with the older Xaero highlighter mixin. Claim search now navigates the map and never hides a claim.
     public static IPlayerChunkClaimAPI filterClaim(IPlayerChunkClaimAPI claim) {
         return claim;
     }
@@ -237,8 +273,20 @@ public final class ClaimSearchClient {
                 && highlight.chunks().contains(new ClaimChunk(chunkX, chunkZ));
     }
 
-    public static int getSelectedClusterHighlightRevision() {
-        return selectedHighlight.revision();
+    public static int getSelectedClusterHighlightRevision(
+            ResourceLocation dimension,
+            int regionX,
+            int regionZ) {
+        SelectedClusterHighlight highlight = selectedHighlight;
+        if (!Objects.equals(highlight.dimension(), dimension)
+                || highlight.chunks().isEmpty()
+                || regionX < (highlight.minX() >> 5)
+                || regionX > (highlight.maxX() >> 5)
+                || regionZ < (highlight.minZ() >> 5)
+                || regionZ > (highlight.maxZ() >> 5)) {
+            return 0;
+        }
+        return highlight.revision();
     }
 
     private static void updateQuery(String value) {
@@ -612,7 +660,6 @@ public final class ClaimSearchClient {
                 attachedCamera.setAccessible(true);
                 attachedCamera.setBoolean(null, false);
             } catch (NoSuchFieldException ignored) {
-                // Older Xaero World Map versions don't have attached camera mode.
             }
 
             Field shouldResetCamera = findField(
@@ -748,7 +795,6 @@ public final class ClaimSearchClient {
                 }
             }
         } catch (ClassNotFoundException ignored) {
-            // Xaero's World Map is optional.
         } catch (ReflectiveOperationException | LinkageError | RuntimeException exception) {
             reportXaeroFailure("refresh claim highlights", exception);
         }
@@ -847,6 +893,7 @@ public final class ClaimSearchClient {
 
     private static void resetSearch() {
         cancelPendingClusterWork();
+        searchToggleButton = null;
         searchBox = null;
         previousButton = null;
         nextButton = null;
@@ -868,8 +915,17 @@ public final class ClaimSearchClient {
     }
 
     private static boolean isXaeroMapScreen(Screen screen) {
-        return screen != null
-                && XAERO_MAP_SCREEN.equals(screen.getClass().getName());
+        if (screen == null) {
+            return false;
+        }
+        Class<?> type = screen.getClass();
+        while (type != null) {
+            if (XAERO_MAP_SCREEN.equals(type.getName())) {
+                return true;
+            }
+            type = type.getSuperclass();
+        }
+        return false;
     }
 
     private record PlayerMatch(UUID id, String username) {
@@ -951,6 +1007,7 @@ public final class ClaimSearchClient {
 
     private static final class SearchToggleButton extends Button {
         private final boolean open;
+        private final Component tooltip;
 
         private SearchToggleButton(int x, int y, boolean open, OnPress onPress) {
             super(
@@ -963,6 +1020,9 @@ public final class ClaimSearchClient {
                     DEFAULT_NARRATION
             );
             this.open = open;
+            this.tooltip = Component.literal(
+                    open ? "Close claim search" : "Open claim search"
+            );
         }
 
         @Override
@@ -974,6 +1034,47 @@ public final class ClaimSearchClient {
             drawFocus(graphics);
             drawMagnifier(graphics, iconX + 1, iconY + 1, 0xA0000000);
             drawMagnifier(graphics, iconX, iconY, color);
+        }
+
+        private void renderXaeroTooltip(GuiGraphics graphics, int mouseX, int mouseY,
+                                        int screenWidth, int screenHeight) {
+            if (mouseX < getX()
+                    || mouseY < getY()
+                    || mouseX >= getX() + getWidth()
+                    || mouseY >= getY() + getHeight()) {
+                return;
+            }
+
+            int boxWidth = Minecraft.getInstance().font.width(tooltip) + 20;
+            int boxHeight = 20;
+            int drawX = mouseX + 12;
+            int drawY = mouseY + 10;
+            int overEdgeX = drawX + boxWidth - screenWidth;
+
+            if (overEdgeX > 9) {
+                drawX = mouseX - 12 - boxWidth;
+            } else if (overEdgeX > 0) {
+                drawX -= overEdgeX;
+            }
+
+            drawX = Math.max(0, drawX);
+            int overEdgeY = drawY + boxHeight - screenHeight;
+
+            if (overEdgeY > boxHeight / 2) {
+                drawY = mouseY - 10 - boxHeight;
+            } else if (overEdgeY > 0) {
+                drawY -= overEdgeY;
+            }
+
+            drawY = Math.max(0, drawY);
+            graphics.fill(drawX, drawY, drawX + boxWidth, drawY + boxHeight, 0xC8000000);
+            graphics.drawString(
+                    Minecraft.getInstance().font,
+                    tooltip,
+                    drawX + 10,
+                    drawY + 6,
+                    0xFFFFFF
+            );
         }
 
         private void drawMagnifier(GuiGraphics graphics, int x, int y, int color) {

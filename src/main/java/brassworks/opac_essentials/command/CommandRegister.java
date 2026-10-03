@@ -1,7 +1,7 @@
 package brassworks.opac_essentials.command;
 
-import brassworks.opac_essentials.config.CommandConfig;
 import brassworks.opac_essentials.claims.permission.model.ClaimPermissionTarget;
+import brassworks.opac_essentials.config.EssentialsConfig;
 import com.mojang.logging.LogUtils;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
@@ -20,19 +20,19 @@ public final class CommandRegister {
 
         Set<String> configuredNames = new HashSet<>();
         String claims = reserve(
-                dispatcher, configuredNames, CommandConfig.CLAIMS_COMMAND.get(), "claims"
+                dispatcher, configuredNames, EssentialsConfig.CLAIMS_COMMAND.get(), "claims"
         );
         String party = reserve(
-                dispatcher, configuredNames, CommandConfig.PARTY_COMMAND.get(), "party"
+                dispatcher, configuredNames, EssentialsConfig.PARTY_COMMAND.get(), "party"
         );
         String claim = reserve(
-                dispatcher, configuredNames, CommandConfig.CLAIM_COMMAND.get(), "claim"
+                dispatcher, configuredNames, EssentialsConfig.CLAIM_COMMAND.get(), "claim"
         );
         String unclaim = reserve(
-                dispatcher, configuredNames, CommandConfig.UNCLAIM_COMMAND.get(), "unclaim"
+                dispatcher, configuredNames, EssentialsConfig.UNCLAIM_COMMAND.get(), "unclaim"
         );
         String partyChat = reserve(
-                dispatcher, configuredNames, CommandConfig.PARTY_CHAT_COMMAND.get(), "party chat"
+                dispatcher, configuredNames, EssentialsConfig.PARTY_CHAT_COMMAND.get(), "party chat"
         );
 
         if (partyChat != null) {

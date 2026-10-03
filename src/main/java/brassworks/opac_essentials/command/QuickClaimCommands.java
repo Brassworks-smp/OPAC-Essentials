@@ -1,7 +1,7 @@
 package brassworks.opac_essentials.command;
 
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.tree.CommandNode;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -17,7 +17,7 @@ public final class QuickClaimCommands {
 
     public void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         CommandNode<CommandSourceStack> openPacClaims =
-                dispatcher.getRoot().getChild("openpac-claims");
+                OpenPacCommandResolver.findClaims(dispatcher);
         if (openPacClaims == null) {
             return;
         }

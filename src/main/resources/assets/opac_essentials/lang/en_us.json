@@ -15,5 +15,7 @@
   "screen.opac_essentials.claim_permissions.player": "Player (or 'all')",
   "screen.opac_essentials.claim_search": "Claim Search",
   "screen.opac_essentials.claim_search.hint": "Search claim owner...",
-  "screen.opac_essentials.claim_search.toggle": "Open/close claim search"
+  "screen.opac_essentials.claim_search.toggle": "Open/close claim search",
+  "message.opac_essentials.create_disassembly_protected": "This contraption cannot be disassembled here because claim protection blocks position %s, %s, %s.",
+  "message.opac_essentials.create_disassembly_check_failed": "The contraption stayed assembled because the OPAC protection check failed. See the server log for details."
 }
