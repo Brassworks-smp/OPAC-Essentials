@@ -48,7 +48,7 @@ jobs:
           # The version number from the manual trigger input
           version: ${{ inputs.version }}
           # The name for the release
-          name: '[${{ inputs.version }}] Create: Brassworks Missions'
+          name: '[${{ inputs.version }}] OPAC - Essentials'
           # Use the changelog.md file for the release notes
           changelog-file: changelog.md
           # Specify the loader for your mod
@@ -61,13 +61,13 @@ jobs:
 
           # --- MODRINTH ---
           # Your Modrinth project ID. Replace with your actual ID.
-          modrinth-id: uUhZpyjI
+          modrinth-id: u0lYa0ln
           # Your Modrinth API token, securely stored as a GitHub secret
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
 
           # --- CURSEFORGE ---
           # Your CurseForge project ID. Replace with your actual ID.
-          curseforge-id: 1348982
+          curseforge-id: 1635645
           # Your CurseForge API token, securely stored as a GitHub secret
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
 
