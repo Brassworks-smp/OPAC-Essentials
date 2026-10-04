@@ -167,19 +167,37 @@ public final class ClaimPermissionService {
         }
         Boolean travelPermission = trainTravelPermission(train, player);
         if (Boolean.FALSE.equals(travelPermission)) {
-            return false;
+            return OpenPacCompat.isClaimsAdminMode(player);
         }
-        return trainControlPermission(train, player);
+        return withTrainAdminBypass(
+                trainOwnerPermission(train, player, ClaimPermissionAction.CONTROL),
+                player
+        );
     }
 
     @Nullable
     private static Boolean trainControlPermission(Entity train, ServerPlayer player) {
-        return trainOwnerPermission(train, player, ClaimPermissionAction.CONTROL);
+        return withTrainAdminBypass(
+                trainOwnerPermission(train, player, ClaimPermissionAction.CONTROL),
+                player
+        );
     }
 
     @Nullable
     private static Boolean trainInteractionPermission(Entity train, ServerPlayer player) {
-        return trainOwnerPermission(train, player, ClaimPermissionAction.INTERACT);
+        return withTrainAdminBypass(
+                trainOwnerPermission(train, player, ClaimPermissionAction.INTERACT),
+                player
+        );
+    }
+
+    @Nullable
+    private static Boolean withTrainAdminBypass(@Nullable Boolean allowed,
+                                                ServerPlayer player) {
+        if (Boolean.FALSE.equals(allowed) && OpenPacCompat.isClaimsAdminMode(player)) {
+            return true;
+        }
+        return allowed;
     }
 
     @Nullable
