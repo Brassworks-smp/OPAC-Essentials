@@ -21,6 +21,8 @@ public final class OpenPacCompat {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final String SERVER_API =
             "xaero.pac.common.server.api.OpenPACServerAPI";
+    private static final String SERVER_PLAYER_DATA_API =
+            "xaero.pac.common.server.player.data.api.ServerPlayerDataAPI";
     private static final String V2_MARKER =
             "xaero.pac.common.event.api.v2.OPACServerAddonRegisterEvent";
     private static final AtomicBoolean REPORTED_FAILURE = new AtomicBoolean();
@@ -56,6 +58,24 @@ public final class OpenPacCompat {
         } catch (ReflectiveOperationException | LinkageError | RuntimeException exception) {
             reportFailure("claim lookup", exception);
             return null;
+        }
+    }
+
+    public static boolean isClaimsAdminMode(ServerPlayer player) {
+        try {
+            Class<?> playerDataClass = Class.forName(
+                    SERVER_PLAYER_DATA_API, true, OpenPacCompat.class.getClassLoader()
+            );
+            Object playerData = invokeStatic(playerDataClass, "from", player);
+            Object api = getServerApi(player.getServer());
+            Object manager = invokeFirst(api,
+                    new String[]{"getServerClaimsManager", "getClaimsManager"});
+            Object permissionHandler = invoke(manager, "getPermissionHandler");
+            invoke(permissionHandler, "ensureAdminModeStatusPermission", player, playerData);
+            return Boolean.TRUE.equals(invoke(playerData, "isClaimsAdminMode"));
+        } catch (ReflectiveOperationException | LinkageError | RuntimeException exception) {
+            reportFailure("claims admin mode lookup", exception);
+            return false;
         }
     }
 
