@@ -7,6 +7,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 public record ClaimPurchaseSettingsPayload(
+        boolean purchaseEnabled,
         String currencyItemId,
         String currencyName,
         int pricePerClaim,
@@ -32,6 +33,7 @@ public record ClaimPurchaseSettingsPayload(
             STREAM_CODEC =
             StreamCodec.of(
                     (buffer, payload) -> {
+                        buffer.writeBoolean(payload.purchaseEnabled());
                         buffer.writeUtf(payload.currencyItemId());
                         buffer.writeUtf(payload.currencyName());
                         buffer.writeVarInt(payload.pricePerClaim());
@@ -48,6 +50,7 @@ public record ClaimPurchaseSettingsPayload(
                         buffer.writeVarInt(payload.claimColor());
                     },
                     buffer -> new ClaimPurchaseSettingsPayload(
+                            buffer.readBoolean(),
                             buffer.readUtf(),
                             buffer.readUtf(),
                             buffer.readVarInt(),

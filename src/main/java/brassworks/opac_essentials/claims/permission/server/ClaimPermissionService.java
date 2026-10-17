@@ -41,6 +41,9 @@ public final class ClaimPermissionService {
     public static boolean allowsBlockAction(ServerLevel level, BlockPos pos,
                                             BlockState blockState, Entity source,
                                             ClaimPermissionAction action) {
+        if (deniesBlockAction(level, pos, blockState, source, action)) {
+            return false;
+        }
         ServerPlayer player = findActingPlayer(source);
         if (player == null) {
             return false;
@@ -108,6 +111,9 @@ public final class ClaimPermissionService {
     }
 
     public static boolean allowsEntityDamage(Entity source, Entity target) {
+        if (deniesEntityDamage(source, target)) {
+            return false;
+        }
         if (!(target.level() instanceof ServerLevel level) || target instanceof ServerPlayer) {
             return false;
         }
@@ -121,6 +127,135 @@ public final class ClaimPermissionService {
         ResourceLocation targetId = BuiltInRegistries.ENTITY_TYPE.getKey(target.getType());
         return allows(level, target.blockPosition(), player,
                 ClaimPermissionTarget.ENTITY, targetId, ClaimPermissionAction.ATTACK);
+    }
+
+    public static boolean deniesBlockAction(ServerLevel level, BlockPos pos,
+                                            BlockState blockState, Entity source,
+                                            ClaimPermissionAction action) {
+        ServerPlayer player = findActingPlayer(source);
+        if (player == null) {
+            return false;
+        }
+        ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(blockState.getBlock());
+        if (denies(level, pos, player, ClaimPermissionTarget.BLOCK, blockId, action)) {
+            return true;
+        }
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+        return blockEntity != null && denies(
+                level,
+                pos,
+                player,
+                ClaimPermissionTarget.BLOCK_ENTITY,
+                BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntity.getType()),
+                action
+        );
+    }
+
+    public static boolean deniesBlockPlacement(ServerLevel level, BlockPos pos, Entity source,
+                                               BlockState placedState) {
+        ServerPlayer player = findActingPlayer(source);
+        if (player == null) {
+            return false;
+        }
+        ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(placedState.getBlock());
+        return denies(level, pos, player, ClaimPermissionTarget.BLOCK, blockId,
+                ClaimPermissionAction.PLACE);
+    }
+
+    public static boolean deniesBlockPlacement(ServerLevel level, Entity source,
+                                               InteractionHand hand, ItemStack heldItem,
+                                               BlockHitResult hitResult) {
+        if (!(heldItem.getItem() instanceof BlockItem blockItem)
+                || !(source instanceof ServerPlayer player)) {
+            return false;
+        }
+        BlockPlaceContext context = new BlockPlaceContext(player, hand, heldItem, hitResult);
+        return deniesBlockPlacement(
+                level,
+                context.getClickedPos(),
+                player,
+                blockItem.getBlock().defaultBlockState()
+        );
+    }
+
+    public static boolean deniesEntityAction(Entity source, Entity target,
+                                             ClaimPermissionAction action) {
+        if (!(target.level() instanceof ServerLevel level) || target instanceof ServerPlayer) {
+            return false;
+        }
+        ServerPlayer player = findActingPlayer(source);
+        if (player == null) {
+            return false;
+        }
+        if (target instanceof Projectile projectile) {
+            return deniesThrowableProjectile(level, target.blockPosition(), player, projectile);
+        }
+        if (action == ClaimPermissionAction.INTERACT && isTrainEntity(target)) {
+            UUID owner = trainOwner(target);
+            return owner != null && !owner.equals(player.getUUID())
+                    && !OpenPacCompat.isClaimsAdminMode(player)
+                    && ClaimPermissionsSavedData.get(player.getServer()).denies(
+                    owner, GLOBAL_SUB_CONFIG_INDEX, ClaimPermissionTarget.TRAIN,
+                    ClaimPermissionTarget.TRAIN_TARGET_ID, action, player.getUUID()
+            );
+        }
+        ResourceLocation targetId = BuiltInRegistries.ENTITY_TYPE.getKey(target.getType());
+        return denies(level, target.blockPosition(), player,
+                ClaimPermissionTarget.ENTITY, targetId, action);
+    }
+
+    public static boolean deniesEntityDamage(Entity source, Entity target) {
+        if (!(target.level() instanceof ServerLevel level) || target instanceof ServerPlayer) {
+            return false;
+        }
+        ServerPlayer player = findActingPlayer(source);
+        if (player == null) {
+            return false;
+        }
+        if (source instanceof Projectile projectile
+                && deniesThrowableProjectile(level, target.blockPosition(), player, projectile)) {
+            return true;
+        }
+        ResourceLocation targetId = BuiltInRegistries.ENTITY_TYPE.getKey(target.getType());
+        return denies(level, target.blockPosition(), player,
+                ClaimPermissionTarget.ENTITY, targetId, ClaimPermissionAction.ATTACK);
+    }
+
+    public static boolean deniesThrowableUse(ServerLevel level, BlockPos pos, Entity source,
+                                             ItemStack itemStack) {
+        ServerPlayer player = findActingPlayer(source);
+        if (player == null || itemStack.isEmpty()) {
+            return false;
+        }
+        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(itemStack.getItem());
+        return denies(level, pos, player, ClaimPermissionTarget.THROWABLE, itemId,
+                ClaimPermissionAction.THROWABLE);
+    }
+
+    public static boolean deniesThrowableImpact(Projectile projectile, BlockPos pos) {
+        if (!(projectile.level() instanceof ServerLevel level)) {
+            return false;
+        }
+        ServerPlayer player = findActingPlayer(projectile);
+        if (player == null) {
+            return false;
+        }
+        return deniesThrowableProjectile(level, pos, player, projectile);
+    }
+
+    private static boolean deniesThrowableProjectile(ServerLevel level, BlockPos pos,
+                                                     ServerPlayer player,
+                                                     Projectile projectile) {
+        ResourceLocation entityId = BuiltInRegistries.ENTITY_TYPE.getKey(projectile.getType());
+        if (denies(level, pos, player, ClaimPermissionTarget.THROWABLE, entityId,
+                ClaimPermissionAction.THROWABLE)) {
+            return true;
+        }
+        ResourceLocation itemId = projectileItemId(projectile);
+        return itemId != null && denies(
+                level, pos, player, ClaimPermissionTarget.THROWABLE, itemId,
+                ClaimPermissionAction.THROWABLE
+        );
     }
 
     @Nullable
@@ -208,6 +343,16 @@ public final class ClaimPermissionService {
             if (player.getUUID().equals(trainOwner)) {
                 return true;
             }
+            if (ClaimPermissionsSavedData.get(player.getServer()).denies(
+                    trainOwner,
+                    GLOBAL_SUB_CONFIG_INDEX,
+                    ClaimPermissionTarget.TRAIN,
+                    ClaimPermissionTarget.TRAIN_TARGET_ID,
+                    action,
+                    player.getUUID()
+            )) {
+                return false;
+            }
             if (ClaimPermissionsSavedData.get(player.getServer()).allows(
                     trainOwner,
                     GLOBAL_SUB_CONFIG_INDEX,
@@ -238,20 +383,26 @@ public final class ClaimPermissionService {
             return false;
         }
         ClaimPermissionsSavedData data = ClaimPermissionsSavedData.get(player.getServer());
+        if (!claim.ownerId().equals(trainOwner) && data.denies(
+                claim.ownerId(), claim.subConfigIndex(), ClaimPermissionTarget.TRAIN,
+                ClaimPermissionTarget.TRAIN_TARGET_ID, ClaimPermissionAction.TRAVEL, trainOwner
+        )) {
+            return false;
+        }
         return claim.ownerId().equals(trainOwner)
                 || data.isTrusted(
-                        claim.ownerId(),
-                        claim.subConfigIndex(),
-                        trainOwner
-                )
+                claim.ownerId(),
+                claim.subConfigIndex(),
+                trainOwner
+        )
                 || data.allows(
-                        claim.ownerId(),
-                        claim.subConfigIndex(),
-                        ClaimPermissionTarget.TRAIN,
-                        ClaimPermissionTarget.TRAIN_TARGET_ID,
-                        ClaimPermissionAction.TRAVEL,
-                        trainOwner
-                );
+                claim.ownerId(),
+                claim.subConfigIndex(),
+                ClaimPermissionTarget.TRAIN,
+                ClaimPermissionTarget.TRAIN_TARGET_ID,
+                ClaimPermissionAction.TRAVEL,
+                trainOwner
+        );
     }
 
     public static boolean allowsThrowableUse(ServerLevel level, BlockPos pos, Entity source,
@@ -277,8 +428,11 @@ public final class ClaimPermissionService {
     }
 
     private static boolean allowsThrowableProjectile(ServerLevel level, BlockPos pos,
-                                                      ServerPlayer player,
-                                                      Projectile projectile) {
+                                                     ServerPlayer player,
+                                                     Projectile projectile) {
+        if (deniesThrowableProjectile(level, pos, player, projectile)) {
+            return false;
+        }
         ResourceLocation entityId = BuiltInRegistries.ENTITY_TYPE.getKey(projectile.getType());
         if (allows(level, pos, player, ClaimPermissionTarget.THROWABLE, entityId,
                 ClaimPermissionAction.THROWABLE)) {
@@ -304,9 +458,28 @@ public final class ClaimPermissionService {
         return null;
     }
 
+    private static boolean denies(ServerLevel level, BlockPos pos, ServerPlayer player,
+                                  ClaimPermissionTarget target, ResourceLocation targetId,
+                                  ClaimPermissionAction action) {
+        OpenPacCompat.Claim claim = OpenPacCompat.getClaimAt(
+                level.getServer(), level.dimension().location(), new ChunkPos(pos)
+        );
+        if (claim == null || claim.ownerId().equals(player.getUUID())
+                || OpenPacCompat.isClaimsAdminMode(player)) {
+            return false;
+        }
+        return ClaimPermissionsSavedData.get(player.getServer()).denies(
+                claim.ownerId(), claim.subConfigIndex(), target, targetId,
+                action, player.getUUID()
+        );
+    }
+
     private static boolean allows(ServerLevel level, BlockPos pos, ServerPlayer player,
                                   ClaimPermissionTarget target, ResourceLocation targetId,
                                   ClaimPermissionAction action) {
+        if (denies(level, pos, player, target, targetId, action)) {
+            return false;
+        }
         OpenPacCompat.Claim claim = OpenPacCompat.getClaimAt(
                 level.getServer(), level.dimension().location(), new ChunkPos(pos)
         );

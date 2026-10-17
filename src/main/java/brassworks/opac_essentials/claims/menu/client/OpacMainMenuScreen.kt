@@ -25,8 +25,6 @@ import gg.essential.elementa.dsl.pixels
 import gg.essential.elementa.dsl.plus
 import gg.essential.universal.UMatrixStack
 import net.minecraft.client.Minecraft
-import net.minecraft.client.gui.components.AbstractButton
-import net.minecraft.client.gui.screens.Screen
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.item.Items
@@ -45,19 +43,18 @@ import net.swzo.brass.ui.kit.surface.BrassWindow
 import net.swzo.brass.ui.kit.text.BrassLabel
 import net.swzo.brass.ui.kit.text.BrassTag
 import net.swzo.brass.ui.kit.text.BrassTextInput
+import xaero.pac.client.gui.ConfigMenu
 import java.awt.Color
 import java.util.Locale
 
-class OpacMainMenuScreen(
-    private val originalMenu: Screen,
-    private val parent: Screen?,
-) : ResponsiveBrassScreen(
+class OpacMainMenuScreen : ResponsiveBrassScreen(
     WINDOW_WIDTH,
     WINDOW_HEIGHT,
     WINDOW_HORIZONTAL_MARGIN,
     WINDOW_VERTICAL_MARGIN,
     Color(0, 0, 0, 72),
 ) {
+    private var purchaseEnabled = false
     private var purchaseAmount = 1
     private var currencyItemId = ClaimPurchaseClientState.currencyItemId()
     private var currencyName = ClaimPurchaseClientState.currencyName()
@@ -84,6 +81,7 @@ class OpacMainMenuScreen(
     private lateinit var claimStatsLabel: BrassLabel
     private lateinit var forceloadStatsLabel: BrassLabel
     private lateinit var claimColorTag: BrassTag
+    private lateinit var purchasePanel: BrassPanel
     private lateinit var unitPriceLabel: BrassLabel
     private lateinit var costLabel: BrassLabel
     private lateinit var purchaseButton: BrassButton
@@ -108,7 +106,7 @@ class OpacMainMenuScreen(
     private fun buildUi() {
         val frame = BrassWindow(
             title = "OPAC",
-            onClose = ::returnToParent,
+            onClose = ::closeScreen,
             controls = false,
             minW = 320f,
             minH = 250f,
@@ -119,7 +117,7 @@ class OpacMainMenuScreen(
             height = responsiveWindowHeightConstraint()
         } childOf background
 
-        BrassSquareButton(BrassIcons.NONE, BrassAccent.DANGER) { returnToParent() }.also {
+        BrassSquareButton(BrassIcons.NONE, BrassAccent.DANGER) { closeScreen() }.also {
             it.entranceEnabled = false
         }.constrain {
             x = 7.pixels(true)
@@ -140,12 +138,12 @@ class OpacMainMenuScreen(
         val content = UIContainer().constrain {
             width = 100.percent()
             height = basicHeightConstraint { component ->
-                maxOf(component.parent.getHeight(), CONTENT_HEIGHT)
+                maxOf(component.parent.getHeight(), if (purchaseEnabled) CONTENT_HEIGHT else 132f)
             }
         } childOf scroll
 
         BrassButton("Player Config") {
-            runOriginalAction(setOf("config"), 0)
+            Minecraft.getInstance().setScreen(ConfigMenu(null, OpacMainMenuScreen()))
         }.also {
             it.chrome = BrassChrome.FLAT
         }.constrain {
@@ -293,6 +291,9 @@ class OpacMainMenuScreen(
             width = 126.pixels()
             height = 20.pixels()
         } childOf purchase.content
+        purchasePanel = purchase
+        OpacEssentialsUiTheme.disableAnimations(purchasePanel)
+        if (!purchaseEnabled) purchasePanel.hide(true)
     }
 
     override fun onDrawScreen(
@@ -302,7 +303,7 @@ class OpacMainMenuScreen(
         partialTicks: Float,
     ) {
         val now = System.currentTimeMillis()
-        if (uiReady && now >= nextPurchaseRefreshAt) {
+        if (uiReady && purchaseEnabled && now >= nextPurchaseRefreshAt) {
             nextPurchaseRefreshAt = now + PURCHASE_REFRESH_INTERVAL
             refreshPurchase()
         }
@@ -318,7 +319,7 @@ class OpacMainMenuScreen(
     }
 
     private fun refreshPurchase() {
-        if (!uiReady) return
+        if (!uiReady || !purchaseEnabled) return
         unitPriceLabel.text = "$pricePerClaim x $currencyName per claim"
         val cost = purchaseAmount * pricePerClaim
         val available = availableCurrency()
@@ -342,6 +343,8 @@ class OpacMainMenuScreen(
     }
 
     fun applyPurchaseSettings(payload: ClaimPurchaseSettingsPayload) {
+        val purchaseVisibilityChanged = purchaseEnabled != payload.purchaseEnabled()
+        purchaseEnabled = payload.purchaseEnabled()
         currencyItemId = payload.currencyItemId()
         currencyName = payload.currencyName()
         pricePerClaim = payload.pricePerClaim()
@@ -357,6 +360,9 @@ class OpacMainMenuScreen(
         partyInvites = payload.partyInvites()
         claimColor = payload.claimColor()
         if (uiReady) {
+            if (purchaseVisibilityChanged) {
+                if (purchaseEnabled) purchasePanel.unhide(true) else purchasePanel.hide(true)
+            }
             partyNameInput.setTextSilently(partyName)
             refreshOverview()
             refreshPurchase()
@@ -423,17 +429,6 @@ class OpacMainMenuScreen(
 
     private fun claimColorValue(): Color = Color(claimColor and 0xFFFFFF)
 
-    private fun runOriginalAction(keywords: Set<String>, fallbackIndex: Int) {
-        val minecraft = Minecraft.getInstance()
-        originalMenu.init(minecraft, width, height)
-        val buttons = originalMenu.children().filterIsInstance<AbstractButton>()
-        val target = buttons.firstOrNull { button ->
-            val label = button.message.string.lowercase(Locale.ROOT)
-            keywords.any { keyword -> label.contains(keyword) }
-        } ?: buttons.getOrNull(fallbackIndex)
-        target?.onPress()
-    }
-
     private fun availableCurrency(): Int {
         val player = Minecraft.getInstance().player ?: return 0
         val currencyId = ResourceLocation.tryParse(currencyItemId) ?: return 0
@@ -447,8 +442,8 @@ class OpacMainMenuScreen(
         return BuiltInRegistries.ITEM.get(currencyId) != Items.AIR
     }
 
-    private fun returnToParent() {
-        Minecraft.getInstance().setScreen(parent)
+    private fun closeScreen() {
+        Minecraft.getInstance().setScreen(null)
     }
 
     companion object {

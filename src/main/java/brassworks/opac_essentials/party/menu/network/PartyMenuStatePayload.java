@@ -35,9 +35,9 @@ public record PartyMenuStatePayload(
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, PartyMenuStatePayload>
             STREAM_CODEC = StreamCodec.of(
-                    PartyMenuStatePayload::encode,
-                    PartyMenuStatePayload::decode
-            );
+            PartyMenuStatePayload::encode,
+            PartyMenuStatePayload::decode
+    );
 
     public PartyMenuStatePayload {
         members = List.copyOf(members);

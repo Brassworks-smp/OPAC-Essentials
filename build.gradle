@@ -132,7 +132,7 @@ sourceSets.main.resources {
 }
 
 dependencies {
-    implementation "curse.maven:open-parties-and-claims-636608:8690620"
+    implementation "curse.maven:open-parties-and-claims-636608:9066682"
     implementation "curse.maven:xaeros-minimap-263420:8449819"
     implementation "curse.maven:xaeros-world-map-317780:8449921"
     implementation "curse.maven:create-328085:7963363"
@@ -150,27 +150,27 @@ def generateModMetadata = tasks.register(
         ProcessResources
 ) {
     def replaceProperties = [
-            minecraft_version:
+            minecraft_version      :
                     minecraft_version,
             minecraft_version_range:
                     minecraft_version_range,
-            neo_version:
+            neo_version            :
                     neo_version,
-            neo_version_range:
+            neo_version_range      :
                     neo_version_range,
-            loader_version_range:
+            loader_version_range   :
                     loader_version_range,
-            mod_id:
+            mod_id                 :
                     mod_id,
-            mod_name:
+            mod_name               :
                     mod_name,
-            mod_license:
+            mod_license            :
                     mod_license,
-            mod_version:
+            mod_version            :
                     mod_version,
-            mod_authors:
+            mod_authors            :
                     mod_authors,
-            mod_description:
+            mod_description        :
                     mod_description
     ]
 

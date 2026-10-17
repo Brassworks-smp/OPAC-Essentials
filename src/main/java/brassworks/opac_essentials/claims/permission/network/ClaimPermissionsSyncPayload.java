@@ -30,49 +30,49 @@ public record ClaimPermissionsSyncPayload(
 
     public static final StreamCodec<RegistryFriendlyByteBuf, ClaimPermissionsSyncPayload>
             STREAM_CODEC = new StreamCodec<>() {
-                @Override
-                public ClaimPermissionsSyncPayload decode(RegistryFriendlyByteBuf buffer) {
-                    UUID claimOwner = buffer.readUUID();
-                    int subConfigIndex = buffer.readVarInt();
-                    String claimOwnerName = buffer.readUtf(128);
-                    String scopeName = buffer.readUtf(128);
-                    boolean adminOverride = buffer.readBoolean();
-                    String status = buffer.readUtf(512);
-                    boolean error = buffer.readBoolean();
-                    int entryCount = checkedSize(buffer.readVarInt(), MAX_ENTRIES, "entry");
-                    List<Entry> entries = new ArrayList<>(entryCount);
-                    for (int index = 0; index < entryCount; index++) {
-                        entries.add(Entry.decode(buffer));
-                    }
-                    return new ClaimPermissionsSyncPayload(
-                            claimOwner,
-                            subConfigIndex,
-                            claimOwnerName,
-                            scopeName,
-                            adminOverride,
-                            status,
-                            error,
-                            entries
-                    );
-                }
+        @Override
+        public ClaimPermissionsSyncPayload decode(RegistryFriendlyByteBuf buffer) {
+            UUID claimOwner = buffer.readUUID();
+            int subConfigIndex = buffer.readVarInt();
+            String claimOwnerName = buffer.readUtf(128);
+            String scopeName = buffer.readUtf(128);
+            boolean adminOverride = buffer.readBoolean();
+            String status = buffer.readUtf(512);
+            boolean error = buffer.readBoolean();
+            int entryCount = checkedSize(buffer.readVarInt(), MAX_ENTRIES, "entry");
+            List<Entry> entries = new ArrayList<>(entryCount);
+            for (int index = 0; index < entryCount; index++) {
+                entries.add(Entry.decode(buffer));
+            }
+            return new ClaimPermissionsSyncPayload(
+                    claimOwner,
+                    subConfigIndex,
+                    claimOwnerName,
+                    scopeName,
+                    adminOverride,
+                    status,
+                    error,
+                    entries
+            );
+        }
 
-                @Override
-                public void encode(RegistryFriendlyByteBuf buffer,
-                                   ClaimPermissionsSyncPayload payload) {
-                    buffer.writeUUID(payload.claimOwner());
-                    buffer.writeVarInt(payload.subConfigIndex());
-                    buffer.writeUtf(payload.claimOwnerName(), 128);
-                    buffer.writeUtf(payload.scopeName(), 128);
-                    buffer.writeBoolean(payload.adminOverride());
-                    buffer.writeUtf(payload.status(), 512);
-                    buffer.writeBoolean(payload.error());
-                    int entryCount = Math.min(payload.entries().size(), MAX_ENTRIES);
-                    buffer.writeVarInt(entryCount);
-                    for (int index = 0; index < entryCount; index++) {
-                        payload.entries().get(index).encode(buffer);
-                    }
-                }
-            };
+        @Override
+        public void encode(RegistryFriendlyByteBuf buffer,
+                           ClaimPermissionsSyncPayload payload) {
+            buffer.writeUUID(payload.claimOwner());
+            buffer.writeVarInt(payload.subConfigIndex());
+            buffer.writeUtf(payload.claimOwnerName(), 128);
+            buffer.writeUtf(payload.scopeName(), 128);
+            buffer.writeBoolean(payload.adminOverride());
+            buffer.writeUtf(payload.status(), 512);
+            buffer.writeBoolean(payload.error());
+            int entryCount = Math.min(payload.entries().size(), MAX_ENTRIES);
+            buffer.writeVarInt(entryCount);
+            for (int index = 0; index < entryCount; index++) {
+                payload.entries().get(index).encode(buffer);
+            }
+        }
+    };
 
     public ClaimPermissionsSyncPayload {
         entries = List.copyOf(entries);
@@ -91,14 +91,20 @@ public record ClaimPermissionsSyncPayload(
     }
 
     public record Entry(String target, String targetId, String action,
-                        String playerId, String playerName) {
+                        String playerId, String playerName, boolean allowed) {
+        public Entry(String target, String targetId, String action,
+                     String playerId, String playerName) {
+            this(target, targetId, action, playerId, playerName, true);
+        }
+
         private static Entry decode(RegistryFriendlyByteBuf buffer) {
             return new Entry(
                     buffer.readUtf(32),
                     buffer.readUtf(256),
                     buffer.readUtf(32),
                     buffer.readUtf(36),
-                    buffer.readUtf(128)
+                    buffer.readUtf(128),
+                    buffer.readBoolean()
             );
         }
 
@@ -108,6 +114,7 @@ public record ClaimPermissionsSyncPayload(
             buffer.writeUtf(action, 32);
             buffer.writeUtf(playerId, 36);
             buffer.writeUtf(playerName, 128);
+            buffer.writeBoolean(allowed);
         }
     }
 }

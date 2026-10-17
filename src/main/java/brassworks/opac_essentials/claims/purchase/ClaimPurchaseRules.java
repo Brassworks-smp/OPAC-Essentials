@@ -9,6 +9,10 @@ public final class ClaimPurchaseRules {
     private ClaimPurchaseRules() {
     }
 
+    public static boolean enabled() {
+        return EssentialsConfig.CLAIM_PURCHASE_ENABLED.get();
+    }
+
     public static ResourceLocation currencyItem() {
         return ResourceLocation.parse(EssentialsConfig.CLAIM_CURRENCY_ITEM.get());
     }

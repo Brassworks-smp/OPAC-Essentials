@@ -225,8 +225,8 @@ public final class PartyMenuService {
                             owner
                                     ? "OWNER"
                                     : self == null
-                                        ? "MEMBER"
-                                        : self.getRank().name(),
+                                    ? "MEMBER"
+                                    : self.getRank().name(),
                             canManageMembers,
                             canManageRanks,
                             chatData.isEnabled(player.getUUID()),

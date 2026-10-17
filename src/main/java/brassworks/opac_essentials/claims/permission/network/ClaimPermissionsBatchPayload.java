@@ -31,69 +31,69 @@ public record ClaimPermissionsBatchPayload(
 
     public static final StreamCodec<RegistryFriendlyByteBuf, ClaimPermissionsBatchPayload>
             STREAM_CODEC = new StreamCodec<>() {
-                @Override
-                public ClaimPermissionsBatchPayload decode(RegistryFriendlyByteBuf buffer) {
-                    Operation operation = Operation.valueOf(buffer.readUtf(32));
-                    UUID claimOwner = buffer.readUUID();
-                    int subConfigIndex = buffer.readVarInt();
-                    boolean enabled = buffer.readBoolean();
+        @Override
+        public ClaimPermissionsBatchPayload decode(RegistryFriendlyByteBuf buffer) {
+            Operation operation = Operation.valueOf(buffer.readUtf(32));
+            UUID claimOwner = buffer.readUUID();
+            int subConfigIndex = buffer.readVarInt();
+            boolean enabled = buffer.readBoolean();
 
-                    int targetCount = checkedSize(buffer.readVarInt(), MAX_TARGETS, "target");
-                    List<TargetEntry> targets = new ArrayList<>(targetCount);
-                    for (int index = 0; index < targetCount; index++) {
-                        targets.add(TargetEntry.decode(buffer));
-                    }
+            int targetCount = checkedSize(buffer.readVarInt(), MAX_TARGETS, "target");
+            List<TargetEntry> targets = new ArrayList<>(targetCount);
+            for (int index = 0; index < targetCount; index++) {
+                targets.add(TargetEntry.decode(buffer));
+            }
 
-                    int actionCount = checkedSize(buffer.readVarInt(), MAX_ACTIONS, "action");
-                    List<String> actions = new ArrayList<>(actionCount);
-                    for (int index = 0; index < actionCount; index++) {
-                        actions.add(buffer.readUtf(32));
-                    }
+            int actionCount = checkedSize(buffer.readVarInt(), MAX_ACTIONS, "action");
+            List<String> actions = new ArrayList<>(actionCount);
+            for (int index = 0; index < actionCount; index++) {
+                actions.add(buffer.readUtf(32));
+            }
 
-                    int playerCount = checkedSize(buffer.readVarInt(), MAX_PLAYERS, "player");
-                    List<String> players = new ArrayList<>(playerCount);
-                    for (int index = 0; index < playerCount; index++) {
-                        players.add(buffer.readUtf(128));
-                    }
+            int playerCount = checkedSize(buffer.readVarInt(), MAX_PLAYERS, "player");
+            List<String> players = new ArrayList<>(playerCount);
+            for (int index = 0; index < playerCount; index++) {
+                players.add(buffer.readUtf(128));
+            }
 
-                    return new ClaimPermissionsBatchPayload(
-                            operation,
-                            claimOwner,
-                            subConfigIndex,
-                            enabled,
-                            targets,
-                            actions,
-                            players
-                    );
-                }
+            return new ClaimPermissionsBatchPayload(
+                    operation,
+                    claimOwner,
+                    subConfigIndex,
+                    enabled,
+                    targets,
+                    actions,
+                    players
+            );
+        }
 
-                @Override
-                public void encode(RegistryFriendlyByteBuf buffer,
-                                   ClaimPermissionsBatchPayload payload) {
-                    buffer.writeUtf(payload.operation().name(), 32);
-                    buffer.writeUUID(payload.claimOwner());
-                    buffer.writeVarInt(payload.subConfigIndex());
-                    buffer.writeBoolean(payload.enabled());
+        @Override
+        public void encode(RegistryFriendlyByteBuf buffer,
+                           ClaimPermissionsBatchPayload payload) {
+            buffer.writeUtf(payload.operation().name(), 32);
+            buffer.writeUUID(payload.claimOwner());
+            buffer.writeVarInt(payload.subConfigIndex());
+            buffer.writeBoolean(payload.enabled());
 
-                    int targetCount = checkedSize(payload.targets().size(), MAX_TARGETS, "target");
-                    buffer.writeVarInt(targetCount);
-                    for (int index = 0; index < targetCount; index++) {
-                        payload.targets().get(index).encode(buffer);
-                    }
+            int targetCount = checkedSize(payload.targets().size(), MAX_TARGETS, "target");
+            buffer.writeVarInt(targetCount);
+            for (int index = 0; index < targetCount; index++) {
+                payload.targets().get(index).encode(buffer);
+            }
 
-                    int actionCount = Math.min(payload.actions().size(), MAX_ACTIONS);
-                    buffer.writeVarInt(actionCount);
-                    for (int index = 0; index < actionCount; index++) {
-                        buffer.writeUtf(payload.actions().get(index), 32);
-                    }
+            int actionCount = Math.min(payload.actions().size(), MAX_ACTIONS);
+            buffer.writeVarInt(actionCount);
+            for (int index = 0; index < actionCount; index++) {
+                buffer.writeUtf(payload.actions().get(index), 32);
+            }
 
-                    int playerCount = Math.min(payload.players().size(), MAX_PLAYERS);
-                    buffer.writeVarInt(playerCount);
-                    for (int index = 0; index < playerCount; index++) {
-                        buffer.writeUtf(payload.players().get(index), 128);
-                    }
-                }
-            };
+            int playerCount = Math.min(payload.players().size(), MAX_PLAYERS);
+            buffer.writeVarInt(playerCount);
+            for (int index = 0; index < playerCount; index++) {
+                buffer.writeUtf(payload.players().get(index), 128);
+            }
+        }
+    };
 
     public ClaimPermissionsBatchPayload {
         targets = List.copyOf(targets);
@@ -120,7 +120,13 @@ public record ClaimPermissionsBatchPayload(
 
     public record TargetEntry(String target, String targetId,
                               String playerId, String playerName,
-                              String action, boolean enabled) {
+                              String action, boolean enabled, boolean allowed) {
+        public TargetEntry(String target, String targetId,
+                           String playerId, String playerName,
+                           String action, boolean enabled) {
+            this(target, targetId, playerId, playerName, action, enabled, true);
+        }
+
         private static TargetEntry decode(RegistryFriendlyByteBuf buffer) {
             return new TargetEntry(
                     buffer.readUtf(32),
@@ -128,6 +134,7 @@ public record ClaimPermissionsBatchPayload(
                     buffer.readUtf(36),
                     buffer.readUtf(128),
                     buffer.readUtf(32),
+                    buffer.readBoolean(),
                     buffer.readBoolean()
             );
         }
@@ -139,6 +146,7 @@ public record ClaimPermissionsBatchPayload(
             buffer.writeUtf(playerName, 128);
             buffer.writeUtf(action, 32);
             buffer.writeBoolean(enabled);
+            buffer.writeBoolean(allowed);
         }
     }
 }

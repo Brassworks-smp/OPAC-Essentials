@@ -12,6 +12,7 @@ public final class EssentialsConfig {
     public static final ModConfigSpec.ConfigValue<String> UNCLAIM_COMMAND;
     public static final ModConfigSpec.ConfigValue<String> PARTY_CHAT_COMMAND;
     public static final ModConfigSpec.BooleanValue PROTECT_TRAIN_CONTROLS;
+    public static final ModConfigSpec.BooleanValue CLAIM_PURCHASE_ENABLED;
     public static final ModConfigSpec.ConfigValue<String> CLAIM_CURRENCY_ITEM;
     public static final ModConfigSpec.IntValue CLAIM_PRICE_PER_CLAIM;
 
@@ -45,6 +46,8 @@ public final class EssentialsConfig {
 
         builder.pop();
         builder.push("claim_purchase");
+
+        CLAIM_PURCHASE_ENABLED = builder.define("enabled", true);
 
         CLAIM_CURRENCY_ITEM = builder.define(
                 "currency_item",

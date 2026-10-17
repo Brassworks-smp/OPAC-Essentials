@@ -69,6 +69,7 @@ public final class ClaimPurchaseService {
         PacketDistributor.sendToPlayer(
                 player,
                 new ClaimPurchaseSettingsPayload(
+                        ClaimPurchaseRules.enabled(),
                         ClaimPurchaseRules.currencyItem().toString(),
                         currencyName,
                         ClaimPurchaseRules.pricePerClaim(),
@@ -152,6 +153,11 @@ public final class ClaimPurchaseService {
     }
 
     public static void purchase(ServerPlayer player, int amount) {
+        if (!ClaimPurchaseRules.enabled()) {
+            send(player, "Claim purchases are currently disabled.", ChatFormatting.RED);
+            return;
+        }
+
         if (amount < 1 || amount > ClaimPurchaseRules.MAX_PURCHASE) {
             send(player, "Invalid claim amount.", ChatFormatting.RED);
             return;

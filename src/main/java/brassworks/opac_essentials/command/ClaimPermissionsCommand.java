@@ -133,6 +133,7 @@ public final class ClaimPermissionsCommand {
         }
         return SharedSuggestionProvider.suggestResource(
                 getPermissions(context.getSource(), claim).stream()
+                        .filter(permission -> permission.targetId().indexOf('*') < 0)
                         .map(this::permissionName)
                         .distinct(),
                 builder
@@ -199,9 +200,10 @@ public final class ClaimPermissionsCommand {
     }
 
     private ResourceLocation permissionName(ClaimPermissionKey permission) {
+        ResourceLocation targetId = ResourceLocation.parse(permission.targetId());
         return ResourceLocation.fromNamespaceAndPath(
                 permission.target().commandName(),
-                permission.targetId().getNamespace() + "/" + permission.targetId().getPath()
+                targetId.getNamespace() + "/" + targetId.getPath()
                         + "/" + permission.action().commandName()
         );
     }
@@ -221,10 +223,7 @@ public final class ClaimPermissionsCommand {
                 break;
             }
         }
-        ResourceLocation targetId = ResourceLocation.tryParse(
-                path.substring(0, firstSeparator) + ":"
-                        + path.substring(firstSeparator + 1, lastSeparator)
-        );
+        String targetId = ClaimPermissionTarget.parseSelector(path.substring(0, firstSeparator) + ":" + path.substring(firstSeparator + 1, lastSeparator));
         ClaimPermissionAction action = null;
         for (ClaimPermissionAction candidate : ClaimPermissionAction.values()) {
             if (candidate.commandName().equals(path.substring(lastSeparator + 1))) {
@@ -265,7 +264,7 @@ public final class ClaimPermissionsCommand {
         );
         return claim != null
                 && (claim.ownerId().equals(player.getUUID())
-                || player.createCommandSourceStack().hasPermission(2))
+                || OpenPacCompat.isClaimsAdminMode(player))
                 ? claim
                 : null;
     }
@@ -279,9 +278,11 @@ public final class ClaimPermissionsCommand {
         }
     }
 
-    private int change(CommandSourceStack source, boolean add, ClaimPermissionTarget target,
-                       ResourceLocation targetId, ClaimPermissionAction action,
-                       UUID playerId, String playerName) {
+    private int change(CommandSourceStack source, boolean add, ClaimPermissionTarget target, ResourceLocation targetId, ClaimPermissionAction action, UUID playerId, String playerName) {
+        return change(source, add, target, targetId.toString(), action, playerId, playerName);
+    }
+
+    private int change(CommandSourceStack source, boolean add, ClaimPermissionTarget target, String targetId, ClaimPermissionAction action, UUID playerId, String playerName) {
         if (!target.supports(action)) {
             source.sendFailure(Component.literal(
                     action.commandName() + " is not valid for " + target.commandName() + "."
@@ -319,13 +320,14 @@ public final class ClaimPermissionsCommand {
                 playerId
         );
         ClaimPermissionsSavedData data = ClaimPermissionsSavedData.get(claimOwner.getServer());
-        if (add && !data.contains(key) && data.isAtCapacity(claim.ownerId())) {
+        if (add && !data.contains(key) && !data.contains(key.withAllowed(false)) && data.isAtCapacity(claim.ownerId())) {
             source.sendFailure(Component.literal(
                     "The permission limit for this claim owner was reached."
             ));
             return 0;
         }
-        boolean changed = add ? data.add(key) : data.remove(key);
+        boolean changed = add ? data.add(key)
+                : data.remove(key) || data.remove(key.withAllowed(false));
 
         if (!changed) {
             source.sendFailure(Component.literal(
@@ -402,7 +404,8 @@ public final class ClaimPermissionsCommand {
                                             + entry.targetId() + " "
                                             + entry.action().commandName()
                             ).withStyle(ChatFormatting.AQUA))
-                            .append(Component.literal(" -> " + playerName)),
+                            .append(Component.literal(" -> " + playerName
+                                    + (entry.allowed() ? "" : " (denied)"))),
                     false
             );
         }
@@ -424,7 +427,7 @@ public final class ClaimPermissionsCommand {
             return null;
         }
         if (!claim.ownerId().equals(player.getUUID())
-                && !player.createCommandSourceStack().hasPermission(2)) {
+                && !OpenPacCompat.isClaimsAdminMode(player)) {
             player.sendSystemMessage(
                     Component.literal(
                             "Only the owner or an admin can change permissions for this claim."
@@ -442,7 +445,7 @@ public final class ClaimPermissionsCommand {
     }
 
     private record PermissionSelection(ClaimPermissionTarget target,
-                                       ResourceLocation targetId,
+                                       String targetId,
                                        ClaimPermissionAction action) {
     }
 }

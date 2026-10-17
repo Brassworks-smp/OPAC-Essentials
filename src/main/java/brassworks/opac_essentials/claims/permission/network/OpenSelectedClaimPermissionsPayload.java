@@ -15,10 +15,10 @@ public record OpenSelectedClaimPermissionsPayload() implements CustomPacketPaylo
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, OpenSelectedClaimPermissionsPayload>
             STREAM_CODEC = StreamCodec.of(
-                    (buffer, payload) -> {
-                    },
-                    buffer -> new OpenSelectedClaimPermissionsPayload()
-            );
+            (buffer, payload) -> {
+            },
+            buffer -> new OpenSelectedClaimPermissionsPayload()
+    );
 
     @Override
     public Type<? extends CustomPacketPayload> type() {

@@ -21,34 +21,34 @@ public record PartyMenuActionPayload(
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, PartyMenuActionPayload>
             STREAM_CODEC = new StreamCodec<>() {
-                @Override
-                public PartyMenuActionPayload decode(RegistryFriendlyByteBuf buffer) {
-                    int actionId = buffer.readVarInt();
-                    Action[] actions = Action.values();
-                    if (actionId < 0 || actionId >= actions.length) {
-                        throw new IllegalArgumentException(
-                                "Unknown party menu action: " + actionId
-                        );
-                    }
-                    UUID target = buffer.readBoolean() ? buffer.readUUID() : null;
-                    return new PartyMenuActionPayload(
-                            actions[actionId],
-                            target,
-                            buffer.readUtf(100)
-                    );
-                }
+        @Override
+        public PartyMenuActionPayload decode(RegistryFriendlyByteBuf buffer) {
+            int actionId = buffer.readVarInt();
+            Action[] actions = Action.values();
+            if (actionId < 0 || actionId >= actions.length) {
+                throw new IllegalArgumentException(
+                        "Unknown party menu action: " + actionId
+                );
+            }
+            UUID target = buffer.readBoolean() ? buffer.readUUID() : null;
+            return new PartyMenuActionPayload(
+                    actions[actionId],
+                    target,
+                    buffer.readUtf(100)
+            );
+        }
 
-                @Override
-                public void encode(RegistryFriendlyByteBuf buffer,
-                                   PartyMenuActionPayload payload) {
-                    buffer.writeVarInt(payload.action().ordinal());
-                    buffer.writeBoolean(payload.target() != null);
-                    if (payload.target() != null) {
-                        buffer.writeUUID(payload.target());
-                    }
-                    buffer.writeUtf(payload.value(), 100);
-                }
-            };
+        @Override
+        public void encode(RegistryFriendlyByteBuf buffer,
+                           PartyMenuActionPayload payload) {
+            buffer.writeVarInt(payload.action().ordinal());
+            buffer.writeBoolean(payload.target() != null);
+            if (payload.target() != null) {
+                buffer.writeUUID(payload.target());
+            }
+            buffer.writeUtf(payload.value(), 100);
+        }
+    };
 
     @Override
     public Type<? extends CustomPacketPayload> type() {

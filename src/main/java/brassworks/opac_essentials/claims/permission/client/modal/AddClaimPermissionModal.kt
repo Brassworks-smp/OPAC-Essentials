@@ -113,7 +113,7 @@ class AddClaimPermissionModal(
 
             targetInput = BrassTextInput(
                 initial = "",
-                placeholder = "minecraft:acacia_button",
+                placeholder = "minecraft:acacia_button or minecraft:*_wool",
             ) { value ->
                 refreshTargetSuggestions(value)
                 refreshValidation()
@@ -277,7 +277,7 @@ class AddClaimPermissionModal(
         }
 
         val trainId = target.registeredIds().findFirst().orElse(null)
-        val currentId = ResourceLocation.tryParse(targetInput.text.trim())
+        val currentId = ClaimPermissionTarget.parseSelector(targetInput.text.trim())
         targetInput.value = when {
             target == ClaimPermissionTarget.TRAIN && trainId != null -> trainId.toString()
             currentId == null || !target.isRegistered(currentId) -> ""
@@ -335,6 +335,11 @@ class AddClaimPermissionModal(
             .sorted(compareBy<String> { matchRank(it, query) }.thenBy { it })
             .limit(MAX_TARGET_SUGGESTIONS.toLong())
             .toList()
+
+        val selector = ClaimPermissionTarget.parseSelector(query)
+        if (selector != null && '*' in selector && currentTargetSuggestions.isNotEmpty()) {
+            currentTargetSuggestions = listOf(selector) + currentTargetSuggestions.take(MAX_TARGET_SUGGESTIONS - 1)
+        }
 
         targetSuggestions.constrain {
             height = (currentTargetSuggestions.size * 14).pixels()
@@ -427,6 +432,13 @@ class AddClaimPermissionModal(
         } else {
             "$permissionCount new ${if (permissionCount == 1) "permission" else "permissions"}"
         }
+        val selector = ClaimPermissionTarget.parseSelector(targetInput.text.trim())
+        if (selector != null && '*' in selector && permissionCount > 0) {
+            val matches = target.registeredIds()
+                .filter { ClaimPermissionTarget.matchesSelector(selector, it.toString()) }
+                .count()
+            validationLabel.text += " · $matches matching targets"
+        }
         validationLabel.tint = if (permissionCount == 0) Colors.WARN else Colors.UI_TEXT_DARK
         submitButton.active = permissionCount > 0
     }
@@ -434,8 +446,11 @@ class AddClaimPermissionModal(
     private fun validationProblem(): String? {
         val rawId = targetInput.text.trim()
         if (rawId.isBlank()) return "Choose or enter a target ID."
-        val targetId = ResourceLocation.tryParse(rawId) ?: return "Invalid registry ID."
-        if (!target.isRegistered(targetId)) return "That registry ID does not exist in this category."
+        val targetId = ClaimPermissionTarget.parseSelector(rawId) ?: return "Invalid registry ID."
+        if (!target.isRegistered(targetId)) {
+            return if ('*' in targetId) "No targets match this group."
+            else "That registry ID does not exist in this category."
+        }
         if (selectedActions.none(target::supports)) return "Select at least one action."
         if (!allPlayers && playerNames().isEmpty()) return "Choose All players or enter player names."
         return null
@@ -448,8 +463,8 @@ class AddClaimPermissionModal(
         .distinctBy { it.lowercase(Locale.ROOT) }
 
     private fun newPermissionCount(): Int {
-        val targetId = ResourceLocation.tryParse(targetInput.text.trim()) ?: return 0
-        val targetRef = PermissionTargetRef(target.name, targetId.toString())
+        val targetId = ClaimPermissionTarget.parseSelector(targetInput.text.trim()) ?: return 0
+        val targetRef = PermissionTargetRef(target.name, targetId)
         val subjects = if (allPlayers) {
             listOf(PermissionSubject.ALL)
         } else {
@@ -476,7 +491,7 @@ class AddClaimPermissionModal(
             return
         }
 
-        val targetId = ResourceLocation.tryParse(targetInput.text.trim()) ?: return
+        val targetId = ClaimPermissionTarget.parseSelector(targetInput.text.trim()) ?: return
         val actions = ClaimPermissionsScreen.supportedActions(target)
             .filter(selectedActions::contains)
         val subjects = if (allPlayers) {
@@ -484,11 +499,15 @@ class AddClaimPermissionModal(
         } else {
             playerNames().map(::permissionSubject)
         }
-        onAdd(PermissionTargetRef(target.name, targetId.toString()), actions, subjects)
+        onAdd(PermissionTargetRef(target.name, targetId), actions, subjects)
         modal.dismiss()
     }
 
     private fun matchesRegistryId(id: String, query: String): Boolean {
+        if ('*' in query) {
+            val selector = ClaimPermissionTarget.parseSelector(query) ?: return false
+            return ClaimPermissionTarget.matchesSelector(selector, id)
+        }
         val path = id.substringAfter(':', id)
         return id.startsWith(query) || path.startsWith(query) || id.contains(query)
     }

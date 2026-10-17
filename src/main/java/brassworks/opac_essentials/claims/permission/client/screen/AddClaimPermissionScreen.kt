@@ -130,7 +130,7 @@ class AddClaimPermissionScreen(
 
         targetInput = BrassTextInput(
             initial = "",
-            placeholder = "minecraft:acacia_button",
+            placeholder = "minecraft:acacia_button or minecraft:*_wool",
         ) { value ->
             refreshTargetSuggestions(value)
             refreshValidation()
@@ -228,7 +228,7 @@ class AddClaimPermissionScreen(
         }
 
         val trainId = target.registeredIds().findFirst().orElse(null)
-        val currentId = ResourceLocation.tryParse(targetInput.text.trim())
+        val currentId = ClaimPermissionTarget.parseSelector(targetInput.text.trim())
         targetInput.value = when {
             target == ClaimPermissionTarget.TRAIN && trainId != null -> trainId.toString()
             currentId == null || !target.isRegistered(currentId) -> ""
@@ -342,9 +342,12 @@ class AddClaimPermissionScreen(
         val rawId = targetInput.text.trim()
         if (rawId.isBlank()) return "Choose or enter a target ID."
 
-        val targetId = ResourceLocation.tryParse(rawId)
+        val targetId = ClaimPermissionTarget.parseSelector(rawId)
             ?: return "Invalid registry ID."
-        if (!target.isRegistered(targetId)) return "That registry ID does not exist in this category."
+        if (!target.isRegistered(targetId)) {
+            return if ('*' in targetId) "No targets match this group."
+            else "That registry ID does not exist in this category."
+        }
         if (selectedActions.none(target::supports)) return "Select at least one action."
         return null
     }
@@ -355,7 +358,7 @@ class AddClaimPermissionScreen(
             return
         }
 
-        val targetId = ResourceLocation.tryParse(targetInput.text.trim()) ?: return
+        val targetId = ClaimPermissionTarget.parseSelector(targetInput.text.trim()) ?: return
         val actions = ClaimPermissionsScreen.supportedActions(target)
             .filter(selectedActions::contains)
         val playerName = playerInput.text.trim().ifBlank { "all" }
@@ -372,7 +375,7 @@ class AddClaimPermissionScreen(
                 payload.claimOwner(),
                 payload.subConfigIndex(),
                 target.name,
-                targetId.toString(),
+                targetId,
                 actions.joinToString(",") { it.name },
                 "",
                 "",
@@ -386,6 +389,10 @@ class AddClaimPermissionScreen(
     }
 
     private fun matchesRegistryId(id: String, query: String): Boolean {
+        if ('*' in query) {
+            val selector = ClaimPermissionTarget.parseSelector(query) ?: return false
+            return ClaimPermissionTarget.matchesSelector(selector, id)
+        }
         val path = id.substringAfter(':', id)
         return id.startsWith(query) || path.startsWith(query) || id.contains(query)
     }

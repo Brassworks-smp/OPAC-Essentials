@@ -37,10 +37,10 @@ public abstract class XaeroChunkHighlighterMixin {
         if (colors == null
                 || colors.length < 256
                 || !ClaimSearchClient.isSelectedClusterChunk(
-                        dimension.location(),
-                        chunkX,
-                        chunkZ
-                )) {
+                dimension.location(),
+                chunkX,
+                chunkZ
+        )) {
             return;
         }
 

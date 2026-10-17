@@ -1,6 +1,7 @@
 package brassworks.opac_essentials.party.menu.client;
 
 import brassworks.opac_essentials.client.ResponsiveBrassScreen;
+import brassworks.opac_essentials.claims.menu.client.OpacMainMenuScreen;
 import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsNetwork;
 import brassworks.opac_essentials.claims.permission.client.OpacEssentialsUiTheme;
 import brassworks.opac_essentials.party.menu.network.PartyMenuActionPayload;
@@ -394,11 +395,25 @@ public final class PartyManagementScreen extends ResponsiveBrassScreen {
                 BrassAccent.Companion.getDANGER(),
                 this::confirmPartyExit
         );
+        partyActionButton.setChrome(snapshot.owner() ? BrassChrome.KEYCAP : BrassChrome.FLAT);
         partyActionButton.setX(new PixelConstraint(8f, true));
         partyActionButton.setY(new PixelConstraint(8f, true));
         partyActionButton.setWidth(new PixelConstraint(100f));
         partyActionButton.setHeight(new PixelConstraint(18f));
         partyActionButton.setChildOf(body);
+
+        BrassButton back = button("Back", BrassAccent.Companion.getDEFAULT(), () ->
+                Minecraft.getInstance().setScreen(
+                        new OpacMainMenuScreen()
+                )
+        );
+        back.setChrome(BrassChrome.KEYCAP);
+        back.setEntranceEnabled(false);
+        back.setX(new PixelConstraint(114f, true));
+        back.setY(new PixelConstraint(8f, true));
+        back.setWidth(new PixelConstraint(54f));
+        back.setHeight(new PixelConstraint(18f));
+        back.setChildOf(body);
 
         refreshLiveControls();
         rebuildHeads();
