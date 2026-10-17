@@ -110,7 +110,7 @@ public final class ClaimTrustCommand {
     }
 
     private OpenPacCompat.Claim getEditableClaim(ServerPlayer player,
-                                                  boolean sendError) {
+                                                 boolean sendError) {
         OpenPacCompat.Claim claim = OpenPacCompat.getClaimAt(
                 player.getServer(),
                 player.level().dimension().location(),
@@ -125,7 +125,7 @@ public final class ClaimTrustCommand {
             return null;
         }
         if (!claim.ownerId().equals(player.getUUID())
-                && !player.createCommandSourceStack().hasPermission(2)) {
+                && !OpenPacCompat.isClaimsAdminMode(player)) {
             if (sendError) {
                 player.sendSystemMessage(Component.literal(
                         "Only the owner or an admin can change trust for this claim."

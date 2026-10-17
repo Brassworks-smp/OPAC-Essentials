@@ -19,30 +19,30 @@ public record ClaimQuickConfigPayload(
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, ClaimQuickConfigPayload>
             STREAM_CODEC = new StreamCodec<>() {
-                @Override
-                public ClaimQuickConfigPayload decode(RegistryFriendlyByteBuf buffer) {
-                    int operationId = buffer.readVarInt();
-                    Operation[] operations = Operation.values();
-                    if (operationId < 0 || operationId >= operations.length) {
-                        throw new IllegalArgumentException(
-                                "Unknown claim quick config operation: " + operationId
-                        );
-                    }
-                    return new ClaimQuickConfigPayload(
-                            operations[operationId],
-                            buffer.readUtf(100),
-                            buffer.readVarInt()
-                    );
-                }
+        @Override
+        public ClaimQuickConfigPayload decode(RegistryFriendlyByteBuf buffer) {
+            int operationId = buffer.readVarInt();
+            Operation[] operations = Operation.values();
+            if (operationId < 0 || operationId >= operations.length) {
+                throw new IllegalArgumentException(
+                        "Unknown claim quick config operation: " + operationId
+                );
+            }
+            return new ClaimQuickConfigPayload(
+                    operations[operationId],
+                    buffer.readUtf(100),
+                    buffer.readVarInt()
+            );
+        }
 
-                @Override
-                public void encode(RegistryFriendlyByteBuf buffer,
-                                   ClaimQuickConfigPayload payload) {
-                    buffer.writeVarInt(payload.operation().ordinal());
-                    buffer.writeUtf(payload.partyName(), 100);
-                    buffer.writeVarInt(payload.claimColor());
-                }
-            };
+        @Override
+        public void encode(RegistryFriendlyByteBuf buffer,
+                           ClaimQuickConfigPayload payload) {
+            buffer.writeVarInt(payload.operation().ordinal());
+            buffer.writeUtf(payload.partyName(), 100);
+            buffer.writeVarInt(payload.claimColor());
+        }
+    };
 
     @Override
     public Type<? extends CustomPacketPayload> type() {

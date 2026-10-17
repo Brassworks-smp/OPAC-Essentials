@@ -23,6 +23,14 @@ public abstract class OpenPacEventsMixin {
     private void opacEssentials$allowPlace(BlockEvent.EntityPlaceEvent event,
                                            CallbackInfo callback) {
         if (event.getLevel() instanceof ServerLevel level
+                && ClaimPermissionService.deniesBlockPlacement(
+                level, event.getPos(), event.getEntity(), event.getPlacedBlock()
+        )) {
+            event.setCanceled(true);
+            callback.cancel();
+            return;
+        }
+        if (event.getLevel() instanceof ServerLevel level
                 && ClaimPermissionService.allowsBlockPlacement(
                 level, event.getPos(), event.getEntity(), event.getPlacedBlock()
         )) {
@@ -34,6 +42,19 @@ public abstract class OpenPacEventsMixin {
     private void opacEssentials$allowMultiPlace(BlockEvent.EntityMultiPlaceEvent event,
                                                 CallbackInfo callback) {
         if (!(event.getLevel() instanceof ServerLevel level)) {
+            return;
+        }
+        boolean anyDenied = event.getReplacedBlockSnapshots().stream().anyMatch(snapshot ->
+                ClaimPermissionService.deniesBlockPlacement(
+                        level,
+                        snapshot.getPos(),
+                        event.getEntity(),
+                        snapshot.getCurrentState()
+                )
+        );
+        if (anyDenied) {
+            event.setCanceled(true);
+            callback.cancel();
             return;
         }
         boolean allAllowed = event.getReplacedBlockSnapshots().stream().allMatch(snapshot ->
@@ -53,6 +74,18 @@ public abstract class OpenPacEventsMixin {
     private void opacEssentials$allowBreakStart(
             PlayerInteractEvent.LeftClickBlock event, CallbackInfo callback) {
         if (event.getLevel() instanceof ServerLevel level
+                && ClaimPermissionService.deniesBlockAction(
+                level,
+                event.getPos(),
+                level.getBlockState(event.getPos()),
+                event.getEntity(),
+                ClaimPermissionAction.BREAK
+        )) {
+            event.setCanceled(true);
+            callback.cancel();
+            return;
+        }
+        if (event.getLevel() instanceof ServerLevel level
                 && ClaimPermissionService.allowsBlockAction(
                 level,
                 event.getPos(),
@@ -67,6 +100,18 @@ public abstract class OpenPacEventsMixin {
     @Inject(method = "onDestroyBlock", at = @At("HEAD"), cancellable = true)
     private void opacEssentials$allowBreak(BlockEvent.BreakEvent event,
                                            CallbackInfo callback) {
+        if (event.getLevel() instanceof ServerLevel level
+                && ClaimPermissionService.deniesBlockAction(
+                level,
+                event.getPos(),
+                event.getState(),
+                event.getPlayer(),
+                ClaimPermissionAction.BREAK
+        )) {
+            event.setCanceled(true);
+            callback.cancel();
+            return;
+        }
         if (event.getLevel() instanceof ServerLevel level
                 && ClaimPermissionService.allowsBlockAction(
                 level,
@@ -118,6 +163,17 @@ public abstract class OpenPacEventsMixin {
     private void opacEssentials$allowThrowableUse(
             PlayerInteractEvent.RightClickItem event, CallbackInfo callback) {
         if (event.getLevel() instanceof ServerLevel level
+                && ClaimPermissionService.deniesThrowableUse(
+                level,
+                event.getPos(),
+                event.getEntity(),
+                event.getItemStack()
+        )) {
+            event.setCanceled(true);
+            callback.cancel();
+            return;
+        }
+        if (event.getLevel() instanceof ServerLevel level
                 && ClaimPermissionService.allowsThrowableUse(
                 level,
                 event.getPos(),
@@ -131,6 +187,13 @@ public abstract class OpenPacEventsMixin {
     @Inject(method = "onEntityAttack", at = @At("HEAD"), cancellable = true)
     private void opacEssentials$allowEntityAttack(AttackEntityEvent event,
                                                   CallbackInfo callback) {
+        if (ClaimPermissionService.deniesEntityAction(
+                event.getEntity(), event.getTarget(), ClaimPermissionAction.ATTACK
+        )) {
+            event.setCanceled(true);
+            callback.cancel();
+            return;
+        }
         if (ClaimPermissionService.allowsEntityAction(
                 event.getEntity(), event.getTarget(), ClaimPermissionAction.ATTACK
         )) {
@@ -141,6 +204,18 @@ public abstract class OpenPacEventsMixin {
     @Inject(method = "onLivingHurt", at = @At("HEAD"), cancellable = true)
     private void opacEssentials$allowEntityDamage(LivingIncomingDamageEvent event,
                                                   CallbackInfo callback) {
+        if (ClaimPermissionService.deniesEntityDamage(
+                event.getSource().getEntity(),
+                event.getEntity()
+        ) || (event.getSource().getDirectEntity() instanceof Projectile
+                && ClaimPermissionService.deniesEntityDamage(
+                event.getSource().getDirectEntity(),
+                event.getEntity()
+        ))) {
+            event.setCanceled(true);
+            callback.cancel();
+            return;
+        }
         if (ClaimPermissionService.allowsEntityDamage(
                 event.getSource().getEntity(),
                 event.getEntity()
@@ -159,6 +234,11 @@ public abstract class OpenPacEventsMixin {
             ProjectileImpactEvent event, CallbackInfo callback) {
         Projectile projectile = event.getProjectile();
         BlockPos impactPos = BlockPos.containing(event.getRayTraceResult().getLocation());
+        if (ClaimPermissionService.deniesThrowableImpact(projectile, impactPos)) {
+            event.setCanceled(true);
+            callback.cancel();
+            return;
+        }
         if (ClaimPermissionService.allowsThrowableImpact(projectile, impactPos)) {
             callback.cancel();
         }
@@ -167,6 +247,11 @@ public abstract class OpenPacEventsMixin {
     @Inject(method = "onEntityInteract", at = @At("HEAD"), cancellable = true)
     private void opacEssentials$allowEntityInteract(
             PlayerInteractEvent.EntityInteract event, CallbackInfo callback) {
+        if (deniesEntityInteraction(event)) {
+            event.setCanceled(true);
+            callback.cancel();
+            return;
+        }
         if (allowsEntityInteraction(event)) {
             callback.cancel();
         }
@@ -175,8 +260,34 @@ public abstract class OpenPacEventsMixin {
     @Inject(method = "onInteractEntitySpecific", at = @At("HEAD"), cancellable = true)
     private void opacEssentials$allowSpecificEntityInteract(
             PlayerInteractEvent.EntityInteractSpecific event, CallbackInfo callback) {
+        if (deniesEntityInteraction(event)) {
+            event.setCanceled(true);
+            callback.cancel();
+            return;
+        }
         if (allowsEntityInteraction(event)) {
             callback.cancel();
+        }
+    }
+
+    @Inject(method = "onRightClickBlock", at = @At("RETURN"))
+    private void opacEssentials$denyBlockInteraction(
+            PlayerInteractEvent.RightClickBlock event, CallbackInfo callback) {
+        if (!(event.getLevel() instanceof ServerLevel level)) {
+            return;
+        }
+        if (ClaimPermissionService.deniesBlockAction(
+                level, event.getPos(), level.getBlockState(event.getPos()),
+                event.getEntity(), ClaimPermissionAction.INTERACT
+        )) {
+            event.setUseBlock(TriState.FALSE);
+        }
+        if (ClaimPermissionService.deniesBlockPlacement(
+                level, event.getEntity(), event.getHand(), event.getItemStack(), event.getHitVec()
+        ) || ClaimPermissionService.deniesThrowableUse(
+                level, event.getPos(), event.getEntity(), event.getItemStack()
+        )) {
+            event.setUseItem(TriState.FALSE);
         }
     }
 
@@ -191,6 +302,23 @@ public abstract class OpenPacEventsMixin {
         PlayerInteractEvent.EntityInteractSpecific entityEvent =
                 (PlayerInteractEvent.EntityInteractSpecific) event;
         return ClaimPermissionService.allowsEntityAction(
+                entityEvent.getEntity(),
+                entityEvent.getTarget(),
+                ClaimPermissionAction.INTERACT
+        );
+    }
+
+    private boolean deniesEntityInteraction(PlayerInteractEvent event) {
+        if (event instanceof PlayerInteractEvent.EntityInteract entityEvent) {
+            return ClaimPermissionService.deniesEntityAction(
+                    entityEvent.getEntity(),
+                    entityEvent.getTarget(),
+                    ClaimPermissionAction.INTERACT
+            );
+        }
+        PlayerInteractEvent.EntityInteractSpecific entityEvent =
+                (PlayerInteractEvent.EntityInteractSpecific) event;
+        return ClaimPermissionService.deniesEntityAction(
                 entityEvent.getEntity(),
                 entityEvent.getTarget(),
                 ClaimPermissionAction.INTERACT

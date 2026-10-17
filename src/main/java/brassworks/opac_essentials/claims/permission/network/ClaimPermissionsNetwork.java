@@ -35,7 +35,7 @@ public final class ClaimPermissionsNetwork {
     }
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("9").optional();
+        PayloadRegistrar registrar = event.registrar("12").optional();
         registrar.playToClient(
                 ClaimPermissionsSyncPayload.TYPE,
                 ClaimPermissionsSyncPayload.STREAM_CODEC,

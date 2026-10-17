@@ -1,13 +1,15 @@
 package brassworks.opac_essentials.claims.permission.client.screen
 
 import brassworks.opac_essentials.client.ResponsiveBrassScreen
+import brassworks.opac_essentials.claims.menu.client.OpacMainMenuScreen
 import brassworks.opac_essentials.claims.permission.client.OpacEssentialsUiTheme
 import brassworks.opac_essentials.claims.permission.client.modal.AddClaimPermissionModal
 import brassworks.opac_essentials.claims.permission.client.modal.BulkPermissionModal
 import brassworks.opac_essentials.claims.permission.client.modal.PermissionDraftEntry
-import brassworks.opac_essentials.claims.permission.client.modal.PermissionPlayersModal
 import brassworks.opac_essentials.claims.permission.client.modal.PermissionSubject
 import brassworks.opac_essentials.claims.permission.client.modal.PermissionTargetRef
+import brassworks.opac_essentials.claims.permission.client.modal.permissionEntry
+import brassworks.opac_essentials.claims.permission.client.modal.permissionSubject
 import brassworks.opac_essentials.claims.permission.model.ClaimPermissionAction
 import brassworks.opac_essentials.claims.permission.model.ClaimPermissionTarget
 import brassworks.opac_essentials.claims.permission.network.ClaimPermissionsBatchPayload
@@ -25,11 +27,13 @@ import gg.essential.elementa.dsl.minus
 import gg.essential.elementa.dsl.percent
 import gg.essential.elementa.dsl.pixels
 import gg.essential.universal.UKeyboard
+import net.minecraft.client.Minecraft
 import net.swzo.brass.ui.BrassThemes
 import net.swzo.brass.ui.Colors
 import net.swzo.brass.ui.kit.base.BrassAccent
 import net.swzo.brass.ui.kit.base.BrassChrome
 import net.swzo.brass.ui.kit.base.BrassDismissable
+import net.swzo.brass.ui.kit.base.BrassWidget
 import net.swzo.brass.ui.kit.input.BrassButton
 import net.swzo.brass.ui.kit.input.BrassCheckbox
 import net.swzo.brass.ui.kit.input.BrassSearchField
@@ -40,11 +44,14 @@ import net.swzo.brass.ui.kit.media.BrassBlockPreview
 import net.swzo.brass.ui.kit.media.BrassEntity
 import net.swzo.brass.ui.kit.media.BrassIcons
 import net.swzo.brass.ui.kit.media.BrassItem
+import net.swzo.brass.ui.kit.media.BrassPlayerHead
 import net.swzo.brass.ui.kit.surface.BrassEmptyState
 import net.swzo.brass.ui.kit.surface.BrassModal
 import net.swzo.brass.ui.kit.surface.BrassPanel
+import net.swzo.brass.ui.kit.surface.BrassTooltip
 import net.swzo.brass.ui.kit.surface.BrassWindow
 import net.swzo.brass.ui.kit.text.BrassLabel
+import net.swzo.brass.ui.kit.text.BrassTextInput
 import org.lwjgl.glfw.GLFW
 import java.util.LinkedHashMap
 import java.util.Locale
@@ -64,15 +71,21 @@ class ClaimPermissionsScreen(
     private var query = ""
     private var selectedCategory: ClaimPermissionTarget? = null
     private var selectedKey: TargetKey? = null
+    private var selectedSubject = PermissionSubject.ALL
+    private val addedSubjects = mutableMapOf<TargetKey, MutableList<PermissionSubject>>()
+    private var addingPlayer = false
+    private var playerSuggestions: UIContainer? = null
     private var visibleTargets: List<TargetGroup> = emptyList()
     private var savingChanges = false
     private var closeAfterSave = false
+    private var returningToMenu = false
     private lateinit var previousThemeId: String
     private var previousAccentHex: String? = null
     private var themeApplied = false
 
     private val permissionCheckboxes = mutableMapOf<PermissionSlot, BrassCheckbox>()
-    private val targetTiles = mutableMapOf<TargetKey, BrassButton>()
+    private val targetTiles = mutableMapOf<TargetKey, BrassWidget>()
+    private val playerControls = mutableListOf<BrassWidget>()
     private var categoryOptions: List<ClaimPermissionTarget?> = emptyList()
     private lateinit var categoryContent: UIContainer
     private lateinit var categorySwitch: BrassTabSwitch
@@ -101,6 +114,8 @@ class ClaimPermissionsScreen(
     }
 
     override fun onScreenClose() {
+        targetTiles.values.forEach(BrassTooltip::detach)
+        playerControls.forEach(BrassTooltip::detach)
         super.onScreenClose()
         if (themeApplied) {
             BrassThemes.apply(previousThemeId, previousAccentHex)
@@ -143,7 +158,12 @@ class ClaimPermissionsScreen(
         val content = UIContainer().constrain {
             width = 100.percent()
             height = basicHeightConstraint { component ->
-                maxOf(component.parent.getHeight(), MIN_CONTENT_HEIGHT)
+                val columns = ((component.parent.getWidth() - 48f) / 140f).toInt().coerceIn(1, 3)
+                val rows = (3 + columns - 1) / columns
+                maxOf(
+                    component.parent.getHeight(),
+                    MIN_CONTENT_HEIGHT + (rows - 1) * 28f + if (addingPlayer) 26f else 0f,
+                )
             }
         } childOf rootScroll
 
@@ -198,7 +218,7 @@ class ClaimPermissionsScreen(
             x = 12.pixels()
             y = 66.pixels()
             width = 100.percent() - 24.pixels()
-            height = 90.pixels()
+            height = 70.pixels()
         } childOf content
 
         val targetScroll = ScrollComponent(
@@ -222,19 +242,30 @@ class ClaimPermissionsScreen(
             layout = BrassPanel.Layout.FREE,
         ).constrain {
             x = 12.pixels()
-            y = 164.pixels()
+            y = 144.pixels()
             width = 100.percent() - 24.pixels()
-            height = 100.percent() - 200.pixels()
+            height = 100.percent() - 180.pixels()
         } childOf content
         detailHost = detailPanel.content
         detailContent = UIContainer().constrain {
+            y = 4.pixels()
             width = 100.percent()
-            height = 100.percent()
+            height = 100.percent() - 4.pixels()
         } childOf detailHost
 
         statusLabel = BrassLabel("", Colors.UI_TEXT_DARK, scale = 0.86f).constrain {
             x = 12.pixels()
             y = 100.percent() - 23.pixels()
+        } childOf content
+
+        BrassButton("Back") { requestClose(returnToMenu = true) }.also {
+            it.chrome = BrassChrome.KEYCAP
+            it.entranceEnabled = false
+        }.constrain {
+            x = 100.percent() - 138.pixels()
+            y = 100.percent() - 30.pixels()
+            width = 50.pixels()
+            height = 18.pixels()
         } childOf content
 
         doneButton = BrassButton("Done", BrassAccent.BRASS) { saveChanges(closeAfter = true) }.constrain {
@@ -338,6 +369,7 @@ class ClaimPermissionsScreen(
     }
 
     private fun updateVisibleTargets(selectFirst: Boolean) {
+        val previousKey = selectedKey
         visibleTargets = groupedTargets()
             .filter { group ->
                 selectedCategory == null ||
@@ -349,6 +381,7 @@ class ClaimPermissionsScreen(
         } else if (visibleTargets.none { it.key == selectedKey }) {
             selectedKey = visibleTargets.firstOrNull()?.key
         }
+        if (selectedKey != previousKey) selectedSubject = PermissionSubject.ALL
     }
 
     private fun groupedTargets(): List<TargetGroup> = draftEntries.values
@@ -357,8 +390,7 @@ class ClaimPermissionsScreen(
         .sortedWith(compareBy<TargetGroup> { it.key.target }.thenBy { it.key.targetId })
 
     private fun matchesQuery(group: TargetGroup): Boolean {
-        if (query.isEmpty()) return true
-        return group.key.targetId.lowercase(Locale.ROOT).contains(query) ||
+        return query.isEmpty() || group.key.targetId.lowercase(Locale.ROOT).contains(query) ||
                 group.key.target.lowercase(Locale.ROOT).contains(query) ||
                 group.entries.any {
                     it.action.lowercase(Locale.ROOT).contains(query) ||
@@ -367,17 +399,13 @@ class ClaimPermissionsScreen(
     }
 
     private fun rebuildTargetStrip() {
+        targetTiles.values.forEach(BrassTooltip::detach)
         targetContent.clearChildren()
         targetTiles.clear()
         if (visibleTargets.isEmpty()) {
             BrassEmptyState(
                 BrassIcons.SEARCH,
                 "No permission targets",
-                if (query.isEmpty() && selectedCategory == null) {
-                    "Add a target to get started"
-                } else {
-                    "Try another category or search term"
-                },
             ).also {
                 it.chrome = BrassChrome.FLAT
                 it.clickable = true
@@ -394,78 +422,37 @@ class ClaimPermissionsScreen(
 
     private fun addTargetTile(index: Int, group: TargetGroup) {
         val selected = group.key == selectedKey
-        val tile = BrassButton(
-            label = "",
-            accent = if (selected) BrassAccent.BRASS else BrassAccent.DEFAULT,
-        ) {
-            if (!savingChanges && selectedKey != group.key) {
-                selectedKey = group.key
-                syncTargetTileSelection()
-                rebuildDetails()
-            }
+        val previewId = parseTarget(group.key.target).previewId(group.key.targetId)
+        val icon = when (parseTarget(group.key.target)) {
+            ClaimPermissionTarget.BLOCK,
+            ClaimPermissionTarget.BLOCK_ENTITY -> BrassBlockPreview(previewId, tooltip = false)
+
+            ClaimPermissionTarget.ENTITY -> BrassEntity(previewId, tooltip = false)
+            ClaimPermissionTarget.TRAIN -> BrassItem(TRAIN_ICON_ITEM, tooltip = false)
+            ClaimPermissionTarget.THROWABLE -> BrassItem(previewId, tooltip = false)
         }.also {
-            it.selectable = true
             it.selected = selected
-            it.chrome = BrassChrome.FLAT
-            it.centered = false
+            it.accent = if (selected) BrassAccent.BRASS else BrassAccent.DEFAULT
+            it.chrome = BrassChrome.KEYCAP
+            it.clickable = true
             it.entranceEnabled = false
-            it.clickable = false
+            it.onMouseClick { event ->
+                if (event.mouseButton == 0 && !savingChanges) {
+                    selectedKey = group.key
+                    selectedSubject = PermissionSubject.ALL
+                    addingPlayer = false
+                    syncTargetTileSelection()
+                    rebuildDetails()
+                }
+            }
         }.constrain {
             x = (2f + index * TARGET_STEP).pixels()
             y = 1.pixels()
-            width = TARGET_WIDTH.pixels()
-            height = TARGET_HEIGHT.pixels()
+            width = TARGET_SIZE.pixels()
+            height = TARGET_SIZE.pixels()
         } childOf targetContent
-        targetTiles[group.key] = tile
-
-        val content = UIContainer().constrain {
-            x = 3.pixels()
-            y = 3.pixels()
-            width = 100.percent() - 6.pixels()
-            height = 100.percent() - 6.pixels()
-        } childOf tile
-
-        when (parseTarget(group.key.target)) {
-            ClaimPermissionTarget.BLOCK,
-            ClaimPermissionTarget.BLOCK_ENTITY -> BrassBlockPreview(group.key.targetId, tooltip = true).constrain {
-                x = CenterConstraint()
-                y = 0.pixels()
-                width = 25.pixels()
-                height = 25.pixels()
-            } childOf content
-
-            ClaimPermissionTarget.ENTITY -> BrassEntity(group.key.targetId, tooltip = true).constrain {
-                x = CenterConstraint()
-                y = 0.pixels()
-                width = 27.pixels()
-                height = 27.pixels()
-            } childOf content
-
-            ClaimPermissionTarget.TRAIN -> BrassItem(TRAIN_ICON_ITEM, tooltip = true).constrain {
-                x = CenterConstraint()
-                y = 0.pixels()
-                width = 25.pixels()
-                height = 25.pixels()
-            } childOf content
-
-            ClaimPermissionTarget.THROWABLE -> BrassItem(group.key.targetId, tooltip = true).constrain {
-                x = CenterConstraint()
-                y = 1.pixels()
-                width = 25.pixels()
-                height = 25.pixels()
-            } childOf content
-        }
-
-        BrassLabel(targetDisplayName(group.key), Colors.UI_TEXT).constrain {
-            x = CenterConstraint()
-            y = 31.pixels()
-        } childOf content
-
-        BrassLabel(tileSummary(group), Colors.UI_TEXT_DARK, scale = 0.7f).constrain {
-            x = CenterConstraint()
-            y = 44.pixels()
-        } childOf content
-        OpacEssentialsUiTheme.disableAnimations(tile)
+        targetTiles[group.key] = icon
+        BrassTooltip.attach(icon, targetDisplayName(group.key), group.key.targetId)
     }
 
     private fun syncTargetTileSelection() {
@@ -477,10 +464,14 @@ class ClaimPermissionsScreen(
     }
 
     private fun rebuildDetails() {
+        playerControls.forEach(BrassTooltip::detach)
+        playerControls.clear()
+        playerSuggestions = null
         val previous = detailContent
         detailContent = UIContainer().constrain {
+            y = 4.pixels()
             width = 100.percent()
-            height = 100.percent()
+            height = 100.percent() - 4.pixels()
         } childOf detailHost
         detailHost.removeChild(previous)
         permissionCheckboxes.clear()
@@ -498,6 +489,7 @@ class ClaimPermissionsScreen(
                 it.entranceEnabled = false
                 it.onMouseClick { openAddPermission() }
             }.constrain {
+                y = (-4).pixels()
                 width = 100.percent()
                 height = 100.percent()
             } childOf detailContent
@@ -511,24 +503,25 @@ class ClaimPermissionsScreen(
             y = 2.pixels()
         } childOf detailContent
 
+        val subject = selectedSubject
         BrassLabel(
-            "${displayTargetName(key.target)}  /  ${subjectSummary(group)}",
+            "${displayTargetName(key.target)}  /  ${subject.displayName()}",
             Colors.UI_TEXT_DARK,
         ).constrain {
             x = 48.pixels()
             y = 16.pixels()
         } childOf detailContent
 
-        BrassButton("Edit players") {
-            PermissionPlayersModal(key.toRef(), group.entries) { subjects ->
-                applyPlayers(key, subjects)
-            }.show(background)
-        }.constrain {
-            x = 100.percent() - 154.pixels()
-            y = 1.pixels()
-            width = 84.pixels()
-            height = 18.pixels()
-        } childOf detailContent
+        if (!subject.isAll) {
+            BrassButton("Remove player", BrassAccent.DANGER) {
+                removeSubject(group, subject)
+            }.constrain {
+                x = 100.percent() - 154.pixels()
+                y = 1.pixels()
+                width = 84.pixels()
+                height = 18.pixels()
+            } childOf detailContent
+        }
 
         BrassButton("Delete", BrassAccent.DANGER) {
             showTargetDeletionConfirmation(key)
@@ -539,8 +532,12 @@ class ClaimPermissionsScreen(
             height = 18.pixels()
         } childOf detailContent
 
+        val hasPlayers = addSubjectStrip(group, subject)
+        val permissionsY = 46 + (if (hasPlayers) 36 else 0) + (if (addingPlayer) 24 else 0) +
+                (if (hasPlayers || addingPlayer) 3 else 0)
+
         BrassLabel("PERMISSIONS", Colors.UI_TEXT_DARK).constrain {
-            y = 49.pixels()
+            y = permissionsY.pixels()
         } childOf detailContent
 
         val target = parseTarget(key.target)
@@ -550,28 +547,218 @@ class ClaimPermissionsScreen(
             itemHeight = 22f,
             stretch = true,
         ).constrain {
-            y = 63.pixels()
+            y = (permissionsY + 14).pixels()
             width = 100.percent()
         } childOf detailContent
 
         supportedActions(target).forEach { action ->
-            permissions.add(permissionCheckboxRow(group, action), 132f)
+            permissions.add(permissionCheckboxRow(group, subject, action), 132f)
         }
         permissions.constrain {
             height = basicHeightConstraint { permissions.contentHeight() }
         }
+        playerSuggestions?.let { suggestions ->
+            detailContent.removeChild(suggestions)
+            detailContent.addChild(suggestions)
+        }
         OpacEssentialsUiTheme.disableAnimations(detailContent)
     }
 
+    private fun addSubjectStrip(group: TargetGroup, selected: PermissionSubject): Boolean {
+        val subjects = buildList<PermissionSubject> {
+            (group.subjects() + addedSubjects[group.key].orEmpty()).forEach { subject ->
+                if (!subject.isAll && none { it.matches(subject) }) add(subject)
+            }
+        }.sortedBy { it.displayName().lowercase(Locale.ROOT) }
+
+        if (subjects.isNotEmpty()) {
+            val scroll = ScrollComponent(
+                emptyString = "",
+                horizontalScrollEnabled = true,
+                verticalScrollEnabled = false,
+            ).constrain {
+                x = 2.pixels()
+                y = 46.pixels()
+                width = 100.percent() - 4.pixels()
+                height = 32.pixels()
+            } childOf detailContent
+            val content = UIContainer().constrain {
+                width = basicWidthConstraint { component ->
+                    maxOf(component.parent.getWidth(), subjects.size * PLAYER_STEP)
+                }
+                height = 100.percent()
+            } childOf scroll
+
+            subjects.forEachIndexed { index, subject ->
+                val head = BrassPlayerHead(subject.playerName, PLAYER_HEAD_SIZE, tooltip = false) {
+                    selectSubject(if (subject.matches(selected)) PermissionSubject.ALL else subject)
+                }.also {
+                    it.accent = if (subject.matches(selected)) BrassAccent.BRASS else BrassAccent.DEFAULT
+                    it.chrome = BrassChrome.KEYCAP
+                    it.clickable = true
+                    it.entranceEnabled = false
+                }.constrain {
+                    x = (2f + index * PLAYER_STEP).pixels()
+                    y = 2.pixels()
+                } childOf content
+                BrassTooltip.attach(head, subject.displayName())
+                playerControls.add(head)
+            }
+        }
+
+        val add = BrassButton(if (addingPlayer) "-" else "+", BrassAccent.BRASS) {
+            if (!savingChanges) {
+                addingPlayer = !addingPlayer
+                rebuildDetails()
+            }
+        }.constrain {
+            x = 100.percent() - (if (selected.isAll) 88 else 176).pixels()
+            y = 1.pixels()
+            width = 18.pixels()
+            height = 18.pixels()
+        } childOf detailContent
+        playerControls.add(add)
+
+        if (addingPlayer) {
+            val inputY = if (subjects.isEmpty()) 46 else 82
+            val suggestions = UIContainer().constrain {
+                x = 2.pixels()
+                y = (inputY + 23).pixels()
+                width = 100.percent() - 66.pixels()
+                height = 0.pixels()
+            } childOf detailContent
+            playerSuggestions = suggestions
+            val suggestionButtons = mutableListOf<BrassButton>()
+            var inputHovered = false
+            var suggestionsHovered = false
+            lateinit var input: BrassTextInput
+
+            fun dismissSuggestions() {
+                suggestions.clearChildren()
+                suggestions.constrain { height = 0.pixels() }
+                playerControls.removeAll(suggestionButtons.toSet())
+                suggestionButtons.clear()
+            }
+
+            fun refreshSuggestions(value: String) {
+                dismissSuggestions()
+                val query = value.substringAfterLast(',').trim().lowercase(Locale.ROOT)
+                if (query.isEmpty() || savingChanges) return
+                val selectedNames = value.substringBeforeLast(',', "")
+                    .split(',')
+                    .map { it.trim().lowercase(Locale.ROOT) }
+                    .filter { it.isNotEmpty() }
+                    .toSet()
+                val names = Minecraft.getInstance().connection?.onlinePlayers
+                    ?.map { it.profile.name }
+                    ?.filter { it.lowercase(Locale.ROOT).startsWith(query) }
+                    ?.filter { it.lowercase(Locale.ROOT) !in selectedNames }
+                    ?.distinctBy { it.lowercase(Locale.ROOT) }
+                    ?.take(MAX_PLAYER_SUGGESTIONS)
+                    ?: emptyList()
+                suggestions.constrain { height = (names.size * 14).pixels() }
+                names.forEachIndexed { index, name ->
+                    val button = BrassButton(name) {
+                        if (!savingChanges) {
+                            val prefix = input.text.substringBeforeLast(',', "").trim()
+                            input.value = if (prefix.isEmpty()) name else "$prefix, $name"
+                            dismissSuggestions()
+                        }
+                    }.also {
+                        it.entranceEnabled = false
+                    }.constrain {
+                        y = (index * 14).pixels()
+                        width = 100.percent()
+                        height = 13.pixels()
+                    } childOf suggestions
+                    suggestionButtons.add(button)
+                    playerControls.add(button)
+                }
+            }
+
+            input = BrassTextInput(placeholder = "Player names, comma-separated") { value ->
+                refreshSuggestions(value)
+            }.constrain {
+                x = 2.pixels()
+                y = inputY.pixels()
+                width = 100.percent() - 66.pixels()
+                height = 19.pixels()
+            } childOf detailContent
+            input.onSubmit = { addSubjects(group.key, input.text) }
+            input.onMouseEnter { inputHovered = true }
+            input.onMouseLeave { inputHovered = false }
+            suggestions.onMouseEnter { suggestionsHovered = true }
+            suggestions.onMouseLeave { suggestionsHovered = false }
+            input.onFocusLost {
+                if (!suggestionsHovered) dismissSuggestions()
+            }
+            detailContent.onMouseClick {
+                if (!inputHovered && !suggestionsHovered) {
+                    dismissSuggestions()
+                    input.loseFocus()
+                }
+            }
+            val confirm = BrassButton("Add", BrassAccent.BRASS) {
+                addSubjects(group.key, input.text)
+            }.constrain {
+                x = 2.pixels(true)
+                y = inputY.pixels()
+                width = 58.pixels()
+                height = 19.pixels()
+            } childOf detailContent
+            playerControls.add(input)
+            playerControls.add(confirm)
+        }
+        return subjects.isNotEmpty()
+    }
+
+    private fun selectSubject(subject: PermissionSubject) {
+        if (savingChanges) return
+        selectedSubject = subject
+        addingPlayer = false
+        rebuildDetails()
+    }
+
+    private fun addSubjects(key: TargetKey, value: String) {
+        if (savingChanges) return
+        val subjects = value.split(',')
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .map(::permissionSubject)
+            .filterNot(PermissionSubject::isAll)
+        if (subjects.isEmpty()) return
+        val players = addedSubjects.getOrPut(key) { mutableListOf() }
+        subjects.forEach { subject ->
+            if (players.none { it.matches(subject) }) players.add(subject)
+        }
+        selectSubject(subjects.first())
+    }
+
+    private fun removeSubject(group: TargetGroup, subject: PermissionSubject) {
+        if (savingChanges) return
+        if (group.entries.all { it.subject.matches(subject) }) {
+            showTargetDeletionConfirmation(group.key)
+            return
+        }
+        draftEntries.entries.removeIf { (_, entry) ->
+            entry.targetRef() == group.key.toRef() && entry.subject.matches(subject)
+        }
+        addedSubjects[group.key]?.removeIf { it.matches(subject) }
+        selectedSubject = PermissionSubject.ALL
+        refreshTargets(selectFirst = false)
+        refreshStatus()
+    }
+
     private fun addLargePreview(key: TargetKey) {
+        val previewId = parseTarget(key.target).previewId(key.targetId)
         when (parseTarget(key.target)) {
             ClaimPermissionTarget.BLOCK,
-            ClaimPermissionTarget.BLOCK_ENTITY -> BrassBlockPreview(key.targetId, spin = 12f, tooltip = true).constrain {
+            ClaimPermissionTarget.BLOCK_ENTITY -> BrassBlockPreview(previewId, spin = 12f, tooltip = true).constrain {
                 width = 38.pixels()
                 height = 36.pixels()
             } childOf detailContent
 
-            ClaimPermissionTarget.ENTITY -> BrassEntity(key.targetId, spin = 12f, tooltip = true).constrain {
+            ClaimPermissionTarget.ENTITY -> BrassEntity(previewId, spin = 12f, tooltip = true).constrain {
                 width = 38.pixels()
                 height = 36.pixels()
             } childOf detailContent
@@ -585,7 +772,7 @@ class ClaimPermissionsScreen(
                 height = 36.pixels()
             } childOf detailContent
 
-            ClaimPermissionTarget.THROWABLE -> BrassItem(key.targetId, tooltip = true).constrain {
+            ClaimPermissionTarget.THROWABLE -> BrassItem(previewId, tooltip = true).constrain {
                 x = 4.pixels()
                 y = 2.pixels()
                 width = 30.pixels()
@@ -596,16 +783,19 @@ class ClaimPermissionsScreen(
 
     private fun permissionCheckboxRow(
         group: TargetGroup,
+        subject: PermissionSubject,
         action: ClaimPermissionAction,
     ): UIContainer {
         val slot = PermissionSlot(group.key, action)
-        val subjects = group.effectiveSubjects()
-        val enabledCount = subjects.count { group.hasAction(it, action) }
+        val entry = permissionEntry(draftEntries.values, group.key.toRef(), action.name, subject)
+        val inherited = !subject.isAll && entry?.subject?.isAll == true
         val row = UIContainer()
         val checkbox = BrassCheckbox(
-            initial = subjects.isNotEmpty() && enabledCount == subjects.size,
+            initial = entry?.allowed == true,
         ) { enabled ->
-            setPermission(group.key, action, enabled)
+            setPermission(group.key, subject, action, enabled)
+        }.also {
+            it.active = !savingChanges
         }.constrain {
             x = 2.pixels()
             y = CenterConstraint()
@@ -614,7 +804,7 @@ class ClaimPermissionsScreen(
         } childOf row
         permissionCheckboxes[slot] = checkbox
 
-        val suffix = if (enabledCount in 1 until subjects.size) " · $enabledCount/${subjects.size}" else ""
+        val suffix = if (inherited) " · All" else ""
         BrassLabel("${displayActionName(action)}$suffix", Colors.UI_TEXT).constrain {
             x = 22.pixels()
             y = CenterConstraint()
@@ -622,42 +812,69 @@ class ClaimPermissionsScreen(
         return row
     }
 
-    private fun setPermission(key: TargetKey, action: ClaimPermissionAction, enabled: Boolean) {
-        if (savingChanges) return
-        val group = groupedTargets().firstOrNull { it.key == key } ?: return
-        val actionEntries = group.entries.filter { it.action == action.name }
-        if (!enabled && actionEntries.size == group.entries.size) {
-            permissionCheckboxes[PermissionSlot(key, action)]?.setSilently(true)
-            showDeletionConfirmation(key, action)
-            return
-        }
-        applyActionChange(group, action, enabled)
-    }
-
-    private fun applyActionChange(
-        group: TargetGroup,
+    private fun setPermission(
+        key: TargetKey,
+        subject: PermissionSubject,
         action: ClaimPermissionAction,
         enabled: Boolean,
     ) {
-        if (enabled) {
-            group.effectiveSubjects().forEach { subject ->
-                putDraft(PermissionDraftEntry(
+        if (savingChanges) return
+        val group = groupedTargets().firstOrNull { it.key == key } ?: return
+        val actionEntries = group.entries.filter {
+            it.action == action.name && it.subject.matches(subject)
+        }
+        if (!enabled && subject.isAll && actionEntries.size == group.entries.size
+            && !inheritsGroupPermission(group.key.toRef(), subject, action)
+        ) {
+            permissionCheckboxes[PermissionSlot(key, action)]?.setSilently(true)
+            showDeletionConfirmation(key, subject, action)
+            return
+        }
+        applyActionChange(group, subject, action, enabled)
+    }
+
+    private fun inheritsGroupPermission(
+        target: PermissionTargetRef,
+        subject: PermissionSubject,
+        action: ClaimPermissionAction,
+    ): Boolean = permissionEntry(
+        draftEntries.values.filterNot { it.targetRef() == target },
+        target,
+        action.name,
+        subject,
+    )?.allowed == true
+
+    private fun applyActionChange(
+        group: TargetGroup,
+        subject: PermissionSubject,
+        action: ClaimPermissionAction,
+        enabled: Boolean,
+    ) {
+        if (enabled || !subject.isAll || inheritsGroupPermission(group.key.toRef(), subject, action)) {
+            putDraft(
+                PermissionDraftEntry(
                     group.key.target,
                     group.key.targetId,
                     action.name,
                     subject,
-                ))
-            }
+                    enabled,
+                )
+            )
         } else {
             draftEntries.entries.removeIf { (_, entry) ->
-                entry.targetRef() == group.key.toRef() && entry.action == action.name
+                entry.targetRef() == group.key.toRef() && entry.action == action.name &&
+                        entry.subject.matches(subject)
             }
         }
         refreshTargets(selectFirst = false)
         refreshStatus()
     }
 
-    private fun showDeletionConfirmation(key: TargetKey, action: ClaimPermissionAction) {
+    private fun showDeletionConfirmation(
+        key: TargetKey,
+        subject: PermissionSubject,
+        action: ClaimPermissionAction,
+    ) {
         val confirmation = BrassModal(
             title = "Remove permission target?",
             width = 318f,
@@ -679,13 +896,14 @@ class ClaimPermissionsScreen(
             BrassButton("Keep permission") { confirmation.dismiss() },
             BrassButton("Delete target", BrassAccent.DANGER) {
                 val group = groupedTargets().firstOrNull { it.key == key }
-                if (group != null) applyActionChange(group, action, false)
+                if (group != null) applyActionChange(group, subject, action, false)
                 confirmation.dismiss()
             },
         ).show(background)
     }
 
     private fun showTargetDeletionConfirmation(key: TargetKey) {
+        if (savingChanges) return
         val confirmation = BrassModal(
             title = "Delete permission target?",
             width = 318f,
@@ -709,6 +927,8 @@ class ClaimPermissionsScreen(
                 draftEntries.entries.removeIf { (_, entry) ->
                     entry.targetRef() == key.toRef()
                 }
+                selectedSubject = PermissionSubject.ALL
+                addedSubjects.remove(key)
                 confirmation.dismiss()
                 refreshTargets(selectFirst = false)
                 refreshStatus()
@@ -727,36 +947,11 @@ class ClaimPermissionsScreen(
             }
         }
         selectedCategory = parseTarget(target.target)
-        selectedKey = TargetKey(target.target, target.targetId)
+        val key = TargetKey(target.target, target.targetId)
+        selectedKey = key
+        selectedSubject = PermissionSubject.ALL
+        addingPlayer = false
         syncCategorySelection()
-        refreshTargets(selectFirst = false)
-        refreshStatus()
-    }
-
-    private fun applyPlayers(key: TargetKey, subjects: List<PermissionSubject>) {
-        val group = groupedTargets().firstOrNull { it.key == key } ?: return
-        val currentSubjects = group.effectiveSubjects()
-        val commonActions = supportedActions(parseTarget(key.target)).filter { action ->
-            currentSubjects.all { group.hasAction(it, action) }
-        }
-        val fallbackActions = group.entries.map { parseAction(it.action) }.distinct()
-        val inheritedActions = commonActions.ifEmpty { fallbackActions }
-        draftEntries.entries.removeIf { (_, entry) ->
-            entry.targetRef() == key.toRef() &&
-                subjects.none { it.matches(entry.subject) }
-        }
-        subjects.forEach { subject ->
-            if (group.entries.none { it.subject.matches(subject) }) {
-                inheritedActions.forEach { action ->
-                    putDraft(PermissionDraftEntry(key.target, key.targetId, action.name, subject))
-                }
-            }
-        }
-        if (subjects.any(PermissionSubject::isAll)) {
-            draftEntries.entries.removeIf { (_, entry) ->
-                entry.targetRef() == key.toRef() && !entry.subject.isAll
-            }
-        }
         refreshTargets(selectFirst = false)
         refreshStatus()
     }
@@ -770,13 +965,13 @@ class ClaimPermissionsScreen(
         targets.forEach { target ->
             actions.filter(parseTarget(target.target)::supports).forEach { action ->
                 subjects.forEach { subject ->
-                    if (enabled) {
-                        putDraft(PermissionDraftEntry(target.target, target.targetId, action.name, subject))
+                    if (enabled || !subject.isAll || inheritsGroupPermission(target, subject, action)) {
+                        putDraft(PermissionDraftEntry(target.target, target.targetId, action.name, subject, enabled))
                     } else {
                         draftEntries.entries.removeIf { (_, entry) ->
                             entry.targetRef() == target &&
                                     entry.action == action.name &&
-                                    (subject.isAll || entry.subject.matches(subject))
+                                    entry.subject.matches(subject)
                         }
                     }
                 }
@@ -790,13 +985,18 @@ class ClaimPermissionsScreen(
         val canonicalSubject = draftEntries.values
             .firstOrNull {
                 it.targetRef() == entry.targetRef() &&
-                    it.subject.matches(entry.subject)
+                        it.subject.matches(entry.subject)
             }
             ?.subject
             ?: entry.subject
         val normalizedEntry = entry.copy(subject = canonicalSubject)
         if (draftEntries.values.any { it.covers(normalizedEntry) }) {
             return
+        }
+        draftEntries.entries.removeIf { (_, existing) ->
+            existing.targetRef() == normalizedEntry.targetRef() &&
+                    existing.action == normalizedEntry.action &&
+                    existing.subject.matches(normalizedEntry.subject)
         }
         draftEntries[normalizedEntry.key()] = normalizedEntry
     }
@@ -836,7 +1036,8 @@ class ClaimPermissionsScreen(
         )
     }
 
-    private fun requestClose() {
+    private fun requestClose(returnToMenu: Boolean = false) {
+        returningToMenu = returnToMenu
         if (!isDirty()) {
             finishClose()
             return
@@ -872,7 +1073,9 @@ class ClaimPermissionsScreen(
     }
 
     private fun finishClose() {
-        onClose()
+        Minecraft.getInstance().setScreen(
+            if (returningToMenu) OpacMainMenuScreen() else null,
+        )
     }
 
     private fun setInteractive(active: Boolean) {
@@ -880,6 +1083,7 @@ class ClaimPermissionsScreen(
         bulkButton.active = active
         doneButton.active = active
         targetTiles.values.forEach { it.active = active }
+        playerControls.forEach { it.active = active }
         categorySwitch.children.filterIsInstance<BrassButton>().forEach { it.active = active }
         permissionCheckboxes.values.forEach { it.active = active }
     }
@@ -912,9 +1116,9 @@ class ClaimPermissionsScreen(
         statusLabel.text = when {
             savingChanges -> "Saving $changeCount changes…"
             payload.error() -> "Error: ${payload.status()} · $changeCount unsaved"
-            changeCount > 0 -> "$changeCount unsaved · $scope · ${draftEntries.size} grants / $targetCount targets"
+            changeCount > 0 -> "$changeCount unsaved · $scope · ${draftEntries.size} rules / $targetCount targets"
             payload.status().isNotBlank() -> "${payload.status()} · $scope"
-            else -> "$scope · ${draftEntries.size} grants / $targetCount targets"
+            else -> "$scope · ${draftEntries.size} rules / $targetCount targets"
         }
         statusLabel.tint = when {
             payload.error() -> Colors.DANGER
@@ -932,27 +1136,13 @@ class ClaimPermissionsScreen(
     }
 
     private fun targetDisplayName(key: TargetKey): String =
-        if (parseTarget(key.target) == ClaimPermissionTarget.TRAIN) {
+        if ('*' in key.targetId) {
+            "Group: ${key.targetId}"
+        } else if (parseTarget(key.target) == ClaimPermissionTarget.TRAIN) {
             "Trains"
         } else {
             shortTargetName(key.targetId)
         }
-
-    private fun tileSummary(group: TargetGroup): String {
-        val actions = supportedActions(parseTarget(group.key.target))
-        val enabled = actions.count(group::hasActionForAll)
-        val actionText = if (enabled == actions.size) "All" else "$enabled/${actions.size}"
-        return "$actionText · ${subjectSummary(group)}"
-    }
-
-    private fun subjectSummary(group: TargetGroup): String {
-        val subjects = group.subjects()
-        return when {
-            subjects.any(PermissionSubject::isAll) -> "All players"
-            subjects.size == 1 -> subjects.first().displayName()
-            else -> "${subjects.size} players"
-        }
-    }
 
     private data class TargetKey(
         val target: String,
@@ -970,24 +1160,6 @@ class ClaimPermissionsScreen(
                 if (none { it.matches(subject) }) add(subject)
             }
         }
-
-        fun effectiveSubjects(): List<PermissionSubject> {
-            val subjects = subjects()
-            return if (subjects.any(PermissionSubject::isAll)) {
-                listOf(PermissionSubject.ALL)
-            } else {
-                subjects
-            }
-        }
-
-        fun hasAction(subject: PermissionSubject, action: ClaimPermissionAction): Boolean =
-            entries.any {
-                it.action == action.name &&
-                    it.subject.matches(subject)
-            }
-
-        fun hasActionForAll(action: ClaimPermissionAction): Boolean =
-            effectiveSubjects().all { hasAction(it, action) }
     }
 
     private data class PermissionSlot(
@@ -1002,10 +1174,12 @@ class ClaimPermissionsScreen(
         private const val MIN_WINDOW_HEIGHT = 120f
         private const val WINDOW_HORIZONTAL_MARGIN = 28f
         private const val WINDOW_VERTICAL_MARGIN = 24f
-        private const val MIN_CONTENT_HEIGHT = 298f
-        private const val TARGET_WIDTH = 90f
-        private const val TARGET_HEIGHT = 58f
-        private const val TARGET_STEP = 96f
+        private const val MIN_CONTENT_HEIGHT = 330f
+        private const val TARGET_SIZE = 32f
+        private const val TARGET_STEP = 38f
+        private const val PLAYER_HEAD_SIZE = 24f
+        private const val PLAYER_STEP = 32f
+        private const val MAX_PLAYER_SUGGESTIONS = 3
         private const val TRAIN_ICON_ITEM = "create:track"
 
         private fun entriesFromPayload(

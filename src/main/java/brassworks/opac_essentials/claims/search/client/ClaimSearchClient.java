@@ -346,7 +346,7 @@ public final class ClaimSearchClient {
                             info.getPlayerUsername()
                     ))
                     .sorted(Comparator
-                            .comparing(
+                            .<PlayerMatch, @org.jetbrains.annotations.NotNull String>comparing(
                                     (PlayerMatch match) -> match.username()
                                             .toLowerCase(Locale.ROOT)
                             )

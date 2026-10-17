@@ -21,7 +21,6 @@ import net.swzo.brass.ui.kit.base.BrassAccent
 import net.swzo.brass.ui.kit.base.BrassChrome
 import net.swzo.brass.ui.kit.input.BrassButton
 import net.swzo.brass.ui.kit.input.BrassCheckbox
-import net.swzo.brass.ui.kit.media.BrassPlayerHead
 import net.swzo.brass.ui.kit.surface.BrassModal
 import net.swzo.brass.ui.kit.surface.BrassPanel
 import net.swzo.brass.ui.kit.text.BrassLabel
@@ -52,7 +51,7 @@ data class PermissionSubject(
 ) {
     val isAll: Boolean
         get() = playerId.isBlank() &&
-            (playerName.isBlank() || playerName.equals("all", true) || playerName.equals("All players", true))
+                (playerName.isBlank() || playerName.equals("all", true) || playerName.equals("All players", true))
 
     fun key(): String = when {
         isAll -> "all"
@@ -65,11 +64,11 @@ data class PermissionSubject(
     fun matches(other: PermissionSubject): Boolean {
         if (isAll || other.isAll) return isAll && other.isAll
         val sameId = playerId.isNotBlank() &&
-            other.playerId.isNotBlank() &&
-            playerId.equals(other.playerId, true)
+                other.playerId.isNotBlank() &&
+                playerId.equals(other.playerId, true)
         val sameName = playerName.isNotBlank() &&
-            other.playerName.isNotBlank() &&
-            playerName.equals(other.playerName, true)
+                other.playerName.isNotBlank() &&
+                playerName.equals(other.playerName, true)
         return sameId || sameName
     }
 
@@ -78,25 +77,23 @@ data class PermissionSubject(
     }
 }
 
-data class PermissionDraftEntry(
+data class PermissionDraftEntry @JvmOverloads constructor(
     val target: String,
     val targetId: String,
     val action: String,
     val subject: PermissionSubject,
+    val allowed: Boolean = true,
 ) {
     fun targetRef(): PermissionTargetRef = PermissionTargetRef(target, targetId)
 
-    fun key(): String = "${targetRef().key()}|$action|${subject.key()}"
+    fun key(): String = "${targetRef().key()}|$action|${subject.key()}|$allowed"
 
     fun matches(other: PermissionDraftEntry): Boolean =
         targetRef() == other.targetRef() &&
-            action == other.action &&
-            subject.matches(other.subject)
+                action == other.action &&
+                subject.matches(other.subject) && allowed == other.allowed
 
-    fun covers(other: PermissionDraftEntry): Boolean =
-        targetRef() == other.targetRef() &&
-            action == other.action &&
-            (subject.isAll || subject.matches(other.subject))
+    fun covers(other: PermissionDraftEntry): Boolean = matches(other)
 
     fun networkEntry(enabled: Boolean): ClaimPermissionsBatchPayload.TargetEntry =
         ClaimPermissionsBatchPayload.TargetEntry(
@@ -106,6 +103,7 @@ data class PermissionDraftEntry(
             if (subject.isAll) "" else subject.playerName,
             action,
             enabled,
+            allowed,
         )
 
     companion object {
@@ -119,8 +117,29 @@ data class PermissionDraftEntry(
                 } else {
                     PermissionSubject(entry.playerId(), entry.playerName())
                 },
+                entry.allowed(),
             )
     }
+}
+
+fun permissionEntry(
+    entries: Collection<PermissionDraftEntry>,
+    target: PermissionTargetRef,
+    action: String,
+    subject: PermissionSubject,
+): PermissionDraftEntry? {
+    val candidates = entries.filter {
+        it.target == target.target && it.action == action &&
+                (it.targetId == target.targetId || ('*' !in target.targetId &&
+                        ClaimPermissionTarget.matchesSelector(it.targetId, target.targetId)))
+    }
+
+    fun forSubject(selected: PermissionSubject): PermissionDraftEntry? =
+        candidates.filter { it.subject.matches(selected) }
+            .maxWithOrNull(compareBy<PermissionDraftEntry> { it.targetId == target.targetId }
+                .thenBy { entry -> entry.targetId.count { it != '*' } }
+                .thenBy { !it.allowed })
+    return forSubject(subject) ?: if (!subject.isAll) forSubject(PermissionSubject.ALL) else null
 }
 
 fun permissionSubject(name: String): PermissionSubject {
@@ -442,10 +461,13 @@ class BulkPermissionModal(
         }
 
     private fun removalCount(players: List<PermissionSubject>): Int =
-        existingEntries.count { entry ->
-            entry.targetRef() in selectedTargets &&
-                selectedActions.any { it.name == entry.action } &&
-                players.any { it.isAll || it.matches(entry.subject) }
+        selectedTargets.sumOf { target ->
+            selectedActions.filter(ClaimPermissionsScreen.parseTarget(target.target)::supports)
+                .sumOf { action ->
+                    players.count { subject ->
+                        permissionEntry(existingEntries, target, action.name, subject)?.allowed == true
+                    }
+                }
         }
 
     private fun confirmRemoval() {
@@ -484,269 +506,6 @@ class BulkPermissionModal(
 
     companion object {
         private const val ACTION_COLUMNS = 4
-    }
-}
-
-class PermissionPlayersModal(
-    private val target: PermissionTargetRef,
-    currentEntries: Collection<PermissionDraftEntry>,
-    private val onApply: (List<PermissionSubject>) -> Unit,
-) {
-    private val modal = BrassModal(
-        title = "OPAC",
-        width = 366f,
-        height = 310f,
-        showClose = false,
-        dismissOnEscape = true,
-    )
-    private val availablePlayers = linkedMapOf<String, PermissionSubject>()
-    private val selectedPlayers = linkedSetOf<String>()
-    private val playerHeads = mutableMapOf<String, BrassPlayerHead>()
-    private var allPlayers = false
-    private lateinit var allPlayersCheckbox: BrassCheckbox
-    private lateinit var playerGrid: UIContainer
-    private lateinit var playerInput: BrassTextInput
-    private lateinit var validationLabel: BrassLabel
-    private lateinit var applyButton: BrassButton
-
-    init {
-        currentEntries.map(PermissionDraftEntry::subject).forEach { subject ->
-            if (availablePlayers.values.any { it.matches(subject) }) {
-                return@forEach
-            }
-            if (subject.isAll) {
-                allPlayers = true
-            } else {
-                availablePlayers[subject.key()] = subject
-                selectedPlayers.add(subject.key())
-            }
-        }
-        Minecraft.getInstance().connection?.onlinePlayers?.forEach { player ->
-            val subject = PermissionSubject(player.profile.id.toString(), player.profile.name)
-            if (availablePlayers.values.none { it.matches(subject) }) {
-                availablePlayers[subject.key()] = subject
-            }
-        }
-        buildUi()
-        rebuildPlayerGrid()
-        refreshState()
-    }
-
-    fun show(root: UIComponent): PermissionPlayersModal = apply {
-        modal.show(root)
-    }
-
-    private fun buildUi() {
-        BrassLabel("/ claims / permissions / players", Colors.UI_TEXT_DARK).also {
-            it.entranceEnabled = false
-        }.constrain {
-            x = 43.pixels()
-            y = 6.pixels()
-        } childOf modal.popup
-
-        modal.body { host ->
-            BrassLabel(permissionTargetName(target), Colors.UI_TEXT).constrain {
-                x = 2.pixels()
-                y = 1.pixels()
-            } childOf host
-
-            BrassLabel(
-                "Selected heads keep access. Click a head to remove it.",
-                Colors.UI_TEXT_DARK,
-                scale = 0.84f,
-            ).constrain {
-                x = 2.pixels()
-                y = 15.pixels()
-            } childOf host
-
-            allPlayersCheckbox = BrassCheckbox(initial = allPlayers) { checked ->
-                allPlayers = checked
-                syncPlayerHeads()
-                refreshState()
-            }.constrain {
-                x = 2.pixels()
-                y = 34.pixels()
-                width = 14.pixels()
-                height = 14.pixels()
-            } childOf host
-
-            BrassLabel("All players", Colors.UI_TEXT).constrain {
-                x = 22.pixels()
-                y = 36.pixels()
-            } childOf host
-
-            val panel = BrassPanel(
-                title = "SPECIFIC PLAYERS",
-                layout = BrassPanel.Layout.FREE,
-            ).constrain {
-                x = 2.pixels()
-                y = 56.pixels()
-                width = 100.percent() - 4.pixels()
-                height = 130.pixels()
-            } childOf host
-
-            val scroll = ScrollComponent(
-                emptyString = "No known players",
-                horizontalScrollEnabled = false,
-                verticalScrollEnabled = true,
-            ).constrain {
-                width = 100.percent()
-                height = 100.percent()
-            } childOf panel.content
-
-            playerGrid = UIContainer().constrain {
-                width = 100.percent() - 5.pixels()
-                height = playerGridHeight(availablePlayers.size).pixels()
-            } childOf scroll
-
-            playerInput = BrassTextInput(
-                initial = "",
-                placeholder = "Add player name",
-            ) {
-                refreshState()
-            }.constrain {
-                x = 2.pixels()
-                y = 196.pixels()
-                width = 100.percent() - 140.pixels()
-                height = 19.pixels()
-            } childOf host
-            playerInput.onSubmit = { addPlayer() }
-
-            BrassButton("+ Add", BrassAccent.BRASS) { addPlayer() }.constrain {
-                x = 100.percent() - 134.pixels()
-                y = 196.pixels()
-                width = 64.pixels()
-                height = 19.pixels()
-            } childOf host
-
-            BrassButton("- Remove", BrassAccent.DANGER) { removePlayer() }.constrain {
-                x = 100.percent() - 66.pixels()
-                y = 196.pixels()
-                width = 64.pixels()
-                height = 19.pixels()
-            } childOf host
-
-            validationLabel = BrassLabel("", Colors.UI_TEXT_DARK, scale = 0.86f).constrain {
-                x = 2.pixels()
-                y = 225.pixels()
-            } childOf host
-        }
-
-        applyButton = BrassButton("Apply players", BrassAccent.BRASS) { applySelection() }
-        modal.footer(
-            BrassButton("Cancel") { modal.dismiss() },
-            applyButton,
-        )
-    }
-
-    private fun rebuildPlayerGrid() {
-        playerGrid.clearChildren()
-        playerHeads.clear()
-        val sortedPlayers = availablePlayers.values
-            .sortedBy { it.playerName.lowercase(Locale.ROOT) }
-        playerGrid.constrain { height = playerGridHeight(sortedPlayers.size).pixels() }
-        sortedPlayers.forEachIndexed { index, subject ->
-            val key = subject.key()
-            val head = BrassPlayerHead(
-                subject.playerName,
-                PLAYER_HEAD_SIZE,
-                tooltip = true,
-            ) {
-                if (key in selectedPlayers) {
-                    selectedPlayers.remove(key)
-                    selectAllPlayersFallback()
-                } else {
-                    selectedPlayers.add(key)
-                }
-                syncPlayerHeads()
-                refreshState()
-            }.constrain {
-                x = (3f + index % PLAYER_COLUMNS * PLAYER_CELL_SIZE).pixels()
-                y = (3f + index / PLAYER_COLUMNS * PLAYER_CELL_SIZE).pixels()
-            } childOf playerGrid
-            head.selectable = true
-            playerHeads[key] = head
-        }
-        syncPlayerHeads()
-    }
-
-    private fun syncPlayerHeads() {
-        playerHeads.forEach { (key, head) ->
-            val selected = key in selectedPlayers
-            head.selected = selected
-            head.accent = if (selected) BrassAccent.BRASS else BrassAccent.DEFAULT
-            head.active = !allPlayers
-        }
-    }
-
-    private fun playerGridHeight(playerCount: Int): Float {
-        val rows = (playerCount + PLAYER_COLUMNS - 1) / PLAYER_COLUMNS
-        return maxOf(1f, rows * PLAYER_CELL_SIZE + 6f)
-    }
-
-    private fun addPlayer() {
-        val name = playerInput.text.trim()
-        if (name.isEmpty()) return
-        val subject = permissionSubject(name)
-        val selectedSubject = availablePlayers.values
-            .firstOrNull { it.matches(subject) }
-            ?: subject.also { availablePlayers[it.key()] = it }
-        selectedPlayers.add(selectedSubject.key())
-        allPlayers = false
-        allPlayersCheckbox.setSilently(false)
-        playerInput.value = ""
-        rebuildPlayerGrid()
-        refreshState()
-    }
-
-    private fun removePlayer() {
-        val name = playerInput.text.trim()
-        if (name.isEmpty() || allPlayers) return
-        val subject = permissionSubject(name)
-        val selectedSubject = availablePlayers.values
-            .firstOrNull { it.matches(subject) }
-            ?: return
-        if (!selectedPlayers.remove(selectedSubject.key())) return
-        selectAllPlayersFallback()
-        playerInput.value = ""
-        syncPlayerHeads()
-        refreshState()
-    }
-
-    private fun refreshState() {
-        if (!::validationLabel.isInitialized) return
-        val count = if (allPlayers) 1 else selectedPlayers.size
-        validationLabel.text = when {
-            allPlayers -> "All players will receive the selected actions."
-            count == 0 -> "Select or add at least one player."
-            count == 1 -> "1 player selected."
-            else -> "$count players selected."
-        }
-        validationLabel.tint = if (count == 0) Colors.WARN else Colors.UI_TEXT_DARK
-        applyButton.active = count > 0
-    }
-
-    private fun applySelection() {
-        if (!applyButton.active) return
-        val subjects = if (allPlayers) {
-            listOf(PermissionSubject.ALL)
-        } else {
-            selectedPlayers.mapNotNull(availablePlayers::get)
-        }
-        onApply(subjects)
-        modal.dismiss()
-    }
-
-    private fun selectAllPlayersFallback() {
-        if (selectedPlayers.isNotEmpty()) return
-        allPlayers = true
-        allPlayersCheckbox.setSilently(true)
-    }
-
-    companion object {
-        private const val PLAYER_COLUMNS = 8
-        private const val PLAYER_CELL_SIZE = 40f
-        private const val PLAYER_HEAD_SIZE = 32f
     }
 }
 

@@ -12,7 +12,6 @@ import com.mojang.authlib.GameProfile;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.storage.LevelResource;
 
@@ -76,7 +75,7 @@ public final class ClaimPermissionsUiService {
 
         ClaimPermissionTarget target;
         List<ClaimPermissionAction> actions;
-        ResourceLocation targetId = ResourceLocation.tryParse(payload.targetId());
+        String targetId = ClaimPermissionTarget.parseSelector(payload.targetId());
         try {
             target = ClaimPermissionTarget.valueOf(payload.target());
             actions = parseActions(payload.action());
@@ -125,7 +124,8 @@ public final class ClaimPermissionsUiService {
                                 selectedAction,
                                 selectedPlayer
                         ))
-                        .filter(permission -> !data.contains(permission))
+                        .filter(permission -> !data.contains(permission)
+                                && !data.contains(permission.withAllowed(!permission.allowed())))
                         .count();
                 if (additions > data.remainingCapacity(claim.ownerId())) {
                     sync(player, claim,
@@ -238,7 +238,7 @@ public final class ClaimPermissionsUiService {
 
         Set<ParsedTarget> targets = new LinkedHashSet<>();
         for (ClaimPermissionsBatchPayload.TargetEntry targetEntry : payload.targets()) {
-            ParsedTarget parsed = parseTarget(targetEntry);
+            ParsedTarget parsed = parseTarget(targetEntry, payload.enabled());
             if (parsed != null) {
                 targets.add(parsed);
             }
@@ -275,7 +275,8 @@ public final class ClaimPermissionsUiService {
         ClaimPermissionsSavedData data = ClaimPermissionsSavedData.get(player.getServer());
         if (payload.enabled()) {
             long additions = permissions.stream()
-                    .filter(permission -> !data.contains(permission))
+                    .filter(permission -> !data.contains(permission)
+                            && !data.contains(permission.withAllowed(!permission.allowed())))
                     .count();
             if (additions > data.remainingCapacity(claim.ownerId())) {
                 sync(player, claim,
@@ -306,7 +307,7 @@ public final class ClaimPermissionsUiService {
         );
         Map<ClaimPermissionKey, Boolean> mutations = new LinkedHashMap<>();
         for (ClaimPermissionsBatchPayload.TargetEntry targetEntry : payload.targets()) {
-            ParsedTarget parsed = parseTarget(targetEntry);
+            ParsedTarget parsed = parseTarget(targetEntry, targetEntry.enabled());
             if (parsed == null) {
                 sync(player, claim, "A selected permission target is no longer valid.", true);
                 return;
@@ -334,7 +335,7 @@ public final class ClaimPermissionsUiService {
                     parsed.targetId(),
                     action,
                     selectedPlayer
-            );
+            ).withAllowed(targetEntry.allowed());
             if (targetEntry.enabled()
                     && selectedPlayer != null
                     && !existing.contains(permission)
@@ -347,9 +348,11 @@ public final class ClaimPermissionsUiService {
         }
 
         long removals = mutations.entrySet().stream()
-                .filter(entry -> !entry.getValue())
-                .map(Map.Entry::getKey)
+                .map(entry -> entry.getValue()
+                        ? entry.getKey().withAllowed(!entry.getKey().allowed())
+                        : entry.getKey())
                 .filter(data::contains)
+                .distinct()
                 .count();
         long additions = mutations.entrySet().stream()
                 .filter(entry -> entry.getValue())
@@ -392,11 +395,11 @@ public final class ClaimPermissionsUiService {
     }
 
     private static ParsedTarget parseTarget(
-            ClaimPermissionsBatchPayload.TargetEntry entry) {
+            ClaimPermissionsBatchPayload.TargetEntry entry, boolean requireRegistered) {
         try {
             ClaimPermissionTarget target = ClaimPermissionTarget.valueOf(entry.target());
-            ResourceLocation targetId = ResourceLocation.tryParse(entry.targetId());
-            if (targetId == null || !target.isRegistered(targetId)) {
+            String targetId = ClaimPermissionTarget.parseSelector(entry.targetId());
+            if (targetId == null || requireRegistered && !target.isRegistered(targetId)) {
                 return null;
             }
             return new ParsedTarget(target, targetId);
@@ -507,7 +510,7 @@ public final class ClaimPermissionsUiService {
 
     private static ClaimPermissionKey key(OpenPacCompat.Claim claim,
                                           ClaimPermissionTarget target,
-                                          ResourceLocation targetId,
+                                          String targetId,
                                           ClaimPermissionAction action,
                                           UUID selectedPlayer) {
         return new ClaimPermissionKey(
@@ -538,12 +541,13 @@ public final class ClaimPermissionsUiService {
                 .limit(ClaimPermissionsSavedData.MAX_PERMISSIONS_PER_OWNER)
                 .map(permission -> new ClaimPermissionsSyncPayload.Entry(
                         permission.target().name(),
-                        permission.targetId().toString(),
+                        permission.targetId(),
                         permission.action().name(),
                         permission.player() == null
                                 ? ""
                                 : permission.player().toString(),
-                        playerName(player, permission.player())
+                        playerName(player, permission.player()),
+                        permission.allowed()
                 ))
                 .toList();
         ClaimPermissionsNetwork.sendTo(
@@ -590,8 +594,8 @@ public final class ClaimPermissionsUiService {
     }
 
     private static OpenPacCompat.Claim currentPayloadClaim(ServerPlayer player,
-                                                            UUID owner,
-                                                            int subConfigIndex) {
+                                                           UUID owner,
+                                                           int subConfigIndex) {
         OpenPacCompat.Claim claim = getEditableClaim(player, false);
         if (claim == null) {
             rejectMutation(player, owner, subConfigIndex,
@@ -634,7 +638,7 @@ public final class ClaimPermissionsUiService {
     }
 
     private static boolean isAdmin(ServerPlayer player) {
-        return player.createCommandSourceStack().hasPermission(2);
+        return OpenPacCompat.isClaimsAdminMode(player);
     }
 
     private static boolean allowMutation(ServerPlayer player) {
@@ -657,7 +661,7 @@ public final class ClaimPermissionsUiService {
     }
 
     private record ParsedTarget(ClaimPermissionTarget target,
-                                ResourceLocation targetId) {
+                                String targetId) {
     }
 
     private record PlayerSelection(List<UUID> players, String error) {
